@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CoreVital Meds Cloud Strategy</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&display=swap');
+
+        :root {
+            --bg-dark: #020617;
+            --card-glass: rgba(30, 41, 59, 0.4);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --cyan: #22d3ee;
+            --emerald: #34d399;
+            --violet: #a78bfa;
+            --amber: #fbbf24;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: radial-gradient(circle at 50% -20%, #1e1b4b, var(--bg-dark) 60%);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+        }
+
+        /* --- Header & Play Button --- */
+        .header {
+            text-align: center;
+            margin-top: 40px;
+            margin-bottom: 20px;
+            z-index: 10;
+        }
+
+        h1 {
+            font-weight: 900;
+            font-size: 2.5rem;
+            margin: 0;
+            background: linear-gradient(to right, #fff, var(--cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -1px;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-weight: 400;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            margin-top: 10px;
+        }
+
+        #play-btn {
+            background: var(--cyan);
+            color: #000;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-weight: 800;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 20px;
+            box-shadow: 0 0 20px rgba(34, 211, 238, 0.4);
+            transition: all 0.3s ease;
+        }
+
+        #play-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 30px rgba(34, 211, 238, 0.6);
+        }
+
+        /* --- Dashboard Container --- */
+        .dashboard {
+            width: 100%;
+            max-width: 1100px;
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        /* --- Total Banner --- */
+        .total-banner {
+            background: rgba(52, 211, 153, 0.1);
+            border: 1px solid rgba(52, 211, 153, 0.3);
+            border-radius: 20px;
+            padding: 20px 40px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            margin: 0 auto;
+            width: fit-content;
+        }
+
+        .total-label {
+            color: var(--emerald);
+            font-weight: 600;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            font-size: 0.9rem;
+        }
+
+        .total-number {
+            font-size: 3.5rem;
+            font-weight: 900;
+            color: #fff;
+            text-shadow: 0 0 20px rgba(52, 211, 153, 0.5);
+            margin-top: 5px;
+        }
+
+        .total-sub {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        /* --- Cost Breakdown Grid --- */
+        .cost-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+        }
+
+        .cost-card {
+            background: var(--card-glass);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            backdrop-filter: blur(12px);
+        }
+
+        .cost-card h3 {
+            margin: 0;
+            font-size: 1.5rem;
+            color: var(--cyan);
+            font-weight: 800;
+        }
+
+        .cost-card p {
+            margin: 5px 0 0 0;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* --- Principles & Tech Grid --- */
+        .split-layout {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+        }
+
+        .section-title {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--card-border);
+            padding-bottom: 8px;
+        }
+
+        .principles-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .principle-item {
+            background: rgba(255,255,255,0.03);
+            border-left: 3px solid var(--violet);
+            padding: 12px 15px;
+            border-radius: 4px 8px 8px 4px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .tech-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .tech-card {
+            background: var(--card-glass);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 18px;
+            backdrop-filter: blur(12px);
+        }
+
+        .tech-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .tech-name {
+            font-weight: 800;
+            color: var(--amber);
+            font-size: 1.1rem;
+        }
+
+        .tech-role {
+            font-size: 0.7rem;
+            background: rgba(255,255,255,0.1);
+            padding: 3px 8px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .tech-desc {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+            margin: 0;
+        }
+
+        /* --- ANIMATION CLASSES (Hidden initially) --- */
+        .anim-item {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .anim-item.revealed {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .scale-item {
+            opacity: 0;
+            transform: scale(0.8);
+            transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .scale-item.revealed {
+            opacity: 1;
+            transform: scale(1);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Cloud Architecture & Cost</h1>
+        <div class="subtitle">Enterprise SaaS Configuration</div>
+        <button id="play-btn" onclick="startPresentation()">Start Presentation</button>
+    </div>
+
+    <div class="dashboard">
+        
+        <div class="total-banner scale-item" id="anim-1">
+            <div class="total-label">Total Cloud Operating Cost</div>
+            <div class="total-number" id="counter">₹0.00</div>
+            <div class="total-sub">Serverless Architecture • Post-Free-Tier Pricing</div>
+        </div>
+
+        <div class="cost-grid">
+            <div class="cost-card anim-item" id="anim-2">
+                <h3>$0.85</h3>
+                <p>CloudFront (10GB)</p>
+            </div>
+            <div class="cost-card anim-item" id="anim-3">
+                <h3>$0.01</h3>
+                <p>API Gateway (10k)</p>
+            </div>
+            <div class="cost-card anim-item" id="anim-4">
+                <h3>$0.02</h3>
+                <p>S3 Storage (1GB)</p>
+            </div>
+            <div class="cost-card anim-item" id="anim-5">
+                <h3>$0.30</h3>
+                <p>Amazon SES (3k)</p>
+            </div>
+        </div>
+
+        <div class="split-layout">
+            
+            <div>
+                <div class="section-title anim-item" id="anim-6">Design Principles</div>
+                <div class="principles-list">
+                    <div class="principle-item anim-item" id="anim-7">⚡ Serverless Compute</div>
+                    <div class="principle-item anim-item" id="anim-8">🌐 Single Unified Frontend</div>
+                    <div class="principle-item anim-item" id="anim-9">📦 Stateless Architecture</div>
+                    <div class="principle-item anim-item" id="anim-10">🧮 Strict FIFO Accounting</div>
+                    <div class="principle-item anim-item" id="anim-11">🔒 IAM Security First</div>
+                </div>
+            </div>
+
+            <div>
+                <div class="section-title anim-item" id="anim-12">Technology Stack</div>
+                <div class="tech-grid">
+                    <div class="tech-card anim-item" id="anim-13">
+                        <div class="tech-header">
+                            <span class="tech-name">Node.js / Express</span>
+                            <span class="tech-role">Backend</span>
+                        </div>
+                        <p class="tech-desc">Lightweight JavaScript execution environment perfectly suited for rapid AWS Lambda cold starts.</p>
+                    </div>
+                    <div class="tech-card anim-item" id="anim-14">
+                        <div class="tech-header">
+                            <span class="tech-name">MongoDB Atlas</span>
+                            <span class="tech-role">Database</span>
+                        </div>
+                        <p class="tech-desc">NoSQL structure accommodates embedded document arrays critical for our FIFO lot-deduction logic.</p>
+                    </div>
+                    <div class="tech-card anim-item" id="anim-15">
+                        <div class="tech-header">
+                            <span class="tech-name">AWS Cognito</span>
+                            <span class="tech-role">Auth</span>
+                        </div>
+                        <p class="tech-desc">Offloads JWT token generation, MFA, and user pool management to enterprise-grade AWS security.</p>
+                    </div>
+                    <div class="tech-card anim-item" id="anim-16">
+                        <div class="tech-header">
+                            <span class="tech-name">Serverless Framework</span>
+                            <span class="tech-role">IaC</span>
+                        </div>
+                        <p class="tech-desc">Automates infrastructure deployment, ensuring predictable and version-controlled AWS staging.</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        function startPresentation() {
+            // 1. Hide the button smoothly
+            const btn = document.getElementById('play-btn');
+            btn.style.opacity = '0';
+            setTimeout(() => btn.style.display = 'none', 300);
+
+            // 2. Timeline Sequence (ID of element, delay in ms)
+            const timeline = [
+                { id: 'anim-1', delay: 200 },  // Big Total
+                
+                // Top Row Costs
+                { id: 'anim-2', delay: 1000 },
+                { id: 'anim-3', delay: 1200 },
+                { id: 'anim-4', delay: 1400 },
+                { id: 'anim-5', delay: 1600 },
+                
+                // Section Titles
+                { id: 'anim-6', delay: 2200 },
+                { id: 'anim-12', delay: 2200 },
+
+                // Principles (Pop in fast)
+                { id: 'anim-7', delay: 2500 },
+                { id: 'anim-8', delay: 2600 },
+                { id: 'anim-9', delay: 2700 },
+                { id: 'anim-10', delay: 2800 },
+                { id: 'anim-11', delay: 2900 },
+
+                // Tech Stack (Fade in staggered)
+                { id: 'anim-13', delay: 3300 },
+                { id: 'anim-14', delay: 3500 },
+                { id: 'anim-15', delay: 3700 },
+                { id: 'anim-16', delay: 3900 },
+            ];
+
+            // 3. Execute Timeline
+            timeline.forEach(step => {
+                setTimeout(() => {
+                    document.getElementById(step.id).classList.add('revealed');
+                }, step.delay);
+            });
+
+            // 4. Animate the Number Counter (Starts at 1000ms)
+            setTimeout(() => {
+                animateValue("counter", 0, 98.27, 2000);
+            }, 500);
+        }
+
+        function animateValue(id, start, end, duration) {
+            let obj = document.getElementById(id);
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                // Ease out quad formula
+                const easeOut = progress * (2 - progress);
+                const current = (easeOut * (end - start) + start).toFixed(2);
+                obj.innerHTML = '₹' + current;
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                } else {
+                    // Final dramatic glow
+                    obj.style.textShadow = "0 0 40px rgba(52, 211, 153, 0.8)";
+                }
+            };
+            window.requestAnimationFrame(step);
+        }
+    </script>
+</body>
+</html>
