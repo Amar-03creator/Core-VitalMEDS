@@ -29,6 +29,7 @@ import BillingPage from './pages/Admin/BillingPage';
 import AnalyticsPage from './pages/Admin/AnalyticsPage';
 import SupportPage from './pages/Admin/SupportPage';
 import NotificationsPage from './pages/Admin/NotificationsPage';
+import ExpiryOffersPage from './pages/Admin/ExpiryOffersPage';
 
 function App() {
   return (
@@ -36,8 +37,8 @@ function App() {
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<LoginPage />} />      {/* ✨ NEW */}
-        <Route path="/register" element={<RegisterPage />} /> {/* ✨ NEW */}
+        <Route path="/login" element={<LoginPage />} />      
+        <Route path="/register" element={<RegisterPage />} /> 
 
         {/* ── CLIENT ROUTES (require auth – later) ── */}
         <Route path="/client-dashboard" element={<ClientLayout />}>
@@ -65,6 +66,7 @@ function App() {
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="support" element={<SupportPage />} />
           <Route path="notifications" element={<NotificationsPage />} />
+          <Route path="expiry-offers" element={<ExpiryOffersPage />} />
         </Route>
       </Routes>
     </Router>
