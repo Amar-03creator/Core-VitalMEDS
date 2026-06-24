@@ -1,31 +1,42 @@
-import { useState } from 'react';
-import { FileText, Wallet, BarChart2, BookOpen, Building2 } from 'lucide-react';
-import { InvoicesTab } from '../../components/Admin/BillingPage/InvoicesTab';
-import { PaymentsTab } from '../../components/Admin/BillingPage/PaymentsTab';
-import { AgingTab } from '../../components/Admin/BillingPage/AgingTab';
-import { PartyLedgerTab } from '../../components/Admin/BillingPage/PartyLedgerTab';
-import { PurchasesTab } from '../../components/Admin/BillingPage/PurchasesTab';
-import { GSTModal } from '../../components/Admin/BillingPage/modals/GSTModal';
-import { MakeInvoiceModal } from '../../components/Admin/BillingPage/modals/MakeInvoiceModal';
+import { useState, useEffect } from 'react';
+import { FileText, Wallet, BookOpen, Building2 } from 'lucide-react';
+import { InvoicesTab } from '../../features/Admin/BillingPage/components/InvoicesTab';
+import { PaymentsTab } from '../../features/Admin/BillingPage/components/PaymentsTab';
+import { LedgersTab } from '../../features/Admin/BillingPage/components/LedgersTab'; 
+import { PurchasesTab } from '../../features/Admin/BillingPage/components/PurchasesTab';
+import { GSTModal } from '../../features/Admin/BillingPage/modals/GSTModal';
+import { MakeInvoiceModal } from '../../features/Admin/BillingPage/modals/MakeInvoiceModal';
+
+const STORAGE_KEY = 'billingActiveTab';
 
 const BillingPage = () => {
-  const [activeTab, setActiveTab] = useState('invoices');
+  const [activeTab, setActiveTab] = useState(() => {
+    const saved = sessionStorage.getItem(STORAGE_KEY);
+    // Safety fallback: if the browser remembers the old deleted tabs, route to the new one
+    if (saved === 'aging' || saved === 'ledger') return 'ledgers';
+    return saved || 'invoices';
+  });
+
   const [showGST, setShowGST] = useState(false);
   const [showMakeInvoice, setShowMakeInvoice] = useState(() => {
     try {
       const saved = sessionStorage.getItem('makeInvoiceState');
-      return !!saved; // if there is any saved state, open the modal
+      return !!saved;
     } catch {
       return false;
     }
   });
 
+  // Persist active tab
+  useEffect(() => {
+    sessionStorage.setItem(STORAGE_KEY, activeTab);
+  }, [activeTab]);
 
+  // ★ FIXED: Removed aging, kept ledgers
   const tabs = [
     { key: 'invoices', label: 'Invoices', icon: FileText },
     { key: 'payments', label: 'Payments', icon: Wallet },
-    { key: 'aging', label: 'Aging', icon: BarChart2 },
-    { key: 'ledger', label: 'Ledger', icon: BookOpen },
+    { key: 'ledgers', label: 'Ledgers', icon: BookOpen },
     { key: 'purchases', label: 'Purchases', icon: Building2 },
   ];
 
@@ -36,14 +47,14 @@ const BillingPage = () => {
         <p className="text-slate-500 text-base">Invoices, payments & outstanding</p>
       </div>
 
-      {/* Fixed grid: 5 equal columns, always shows all tabs with labels */}
-      <div className="grid grid-cols-5 gap-1 bg-slate-100 rounded-2xl p-1">
+      {/* ★ FIXED: Changed to grid-cols-4 for the 4 tabs */}
+      <div className="grid grid-cols-4 gap-1 bg-slate-100 rounded-2xl p-1">
         {tabs.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
             onClick={() => setActiveTab(key)}
             className={`flex flex-col items-center gap-0.5 py-2 rounded-xl text-sm font-semibold transition-all
-              ${activeTab === key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
+              ${activeTab === key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
           >
             <Icon size={18} />
             <span>{label}</span>
@@ -53,8 +64,8 @@ const BillingPage = () => {
 
       {activeTab === 'invoices' && <InvoicesTab onGST={() => setShowGST(true)} onMakeInvoice={() => setShowMakeInvoice(true)} />}
       {activeTab === 'payments' && <PaymentsTab />}
-      {activeTab === 'aging' && <AgingTab />}
-      {activeTab === 'ledger' && <PartyLedgerTab />}
+      {/* ★ FIXED: Render the new unified tab */}
+      {activeTab === 'ledgers' && <LedgersTab />}
       {activeTab === 'purchases' && <PurchasesTab />}
 
       {showGST && <GSTModal onClose={() => setShowGST(false)} />}
