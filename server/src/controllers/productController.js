@@ -1,70 +1,84 @@
-// 1. Import the Product model blueprint
-const Product = require('../models/Product'); // Hint: The exact name of your model file
+const Product = require('../models/Product');
+const mongoose = require('mongoose');
 
-// --- CREATE PRODUCT (POST) ---
+/* ── Create ──────────────────────────────────────────────────────────────── */
+/* ── Create ──────────────────────────────────────────────────────────────── */
 exports.createProduct = async (req, res) => {
   try {
-    // 1. Extract ALL the mandatory fields you set in the schema
     const {
-      name,
-      company,
-      companyId,
-      composition,
-      category,
-      type,
-      packing,
-      hsnCode,
-      sku,
-      gstRate,
-      // If you want to let him override the defaults at creation, extract these too:
-      shortExpiryThreshold,
-      lowStockThreshold
+      name, company, companyId,
+      compositions, categories,
+      type, packing, hsnCode, gstRate,
+      shortExpiryThreshold, lowStockThreshold,
+      description, usageTips,
     } = req.body;
 
-    // 2. Map them all into the new Product memory instance
+    // Required field check
+    if (!name || !companyId || !type || !packing || !hsnCode || gstRate === undefined) {
+      return res.status(400).json({ message: 'Missing required fields.' });
+    }
+
+    // Validate companyId
+    if (!mongoose.Types.ObjectId.isValid(companyId)) {
+      return res.status(400).json({ message: 'Invalid companyId.' });
+    }
+
+    const trimmedName = name.trim();
+    const escapedName = trimmedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // ★ GLOBAL uniqueness check – no companyId filter
+    const exists = await Product.findOne({
+      name: { $regex: `^${escapedName}$`, $options: 'i' },
+    });
+
+    if (exists) {
+      return res.status(409).json({
+        message: `"${exists.name}" already exists in the catalog.`,
+      });
+    }
+
     const newProduct = new Product({
-      name,
-      company,
-      companyId,
-      composition,
-      category,
-      type,
-      packing,
-      hsnCode,
-      sku,
-      gstRate,
-      // 3. Only pass these if the frontend actually sent them. 
-      // If they are undefined, Mongoose will safely use the defaults (90 and 50)!
-      shortExpiryThreshold,
-      lowStockThreshold
+      name:      trimmedName,
+      company:   company || '',
+      companyId: new mongoose.Types.ObjectId(companyId),
+      compositions: Array.isArray(compositions) ? compositions.filter(c => c?.trim()) : [],
+      categories:   Array.isArray(categories)   ? categories                          : [],
+      type, packing, hsnCode,
+      gstRate:              parseFloat(gstRate),
+      shortExpiryThreshold: shortExpiryThreshold ? parseInt(shortExpiryThreshold) : undefined,
+      lowStockThreshold:    lowStockThreshold    ? parseInt(lowStockThreshold)    : undefined,
+      description,
+      usageTips,
     });
 
-    // 4. Save it physically to MongoDB Atlas
-    await newProduct.save(); // Hint: Mongoose command to save
-
-    // 5. Send success response
-    res.status(201).json({
-      message: "Medicine added to the catalog!",
-      data: newProduct
-    });
+    await newProduct.save();
+    res.status(201).json({ message: 'Product created successfully!', data: newProduct });
 
   } catch (error) {
+    console.error('[createProduct] error:', error);
+    if (error.code === 11000) {
+      // Mongoose unique index violation – also global
+      return res.status(409).json({ message: 'A product with this name already exists.' });
+    }
     res.status(500).json({ error: error.message });
   }
 };
 
-// --- GET ALL PRODUCTS (GET) ---
+/* ── Get all  OR  filter by companyId ───────────────────────────────────── */
 exports.getAllProducts = async (req, res) => {
   try {
-    // Fetch all products from the database
-    const products = await Product.find();
+    const { companyId } = req.query;
 
-    res.status(200).json({
-      success: true,
-      count: products.length,
-      data: products
-    });
+    if (companyId && !mongoose.Types.ObjectId.isValid(companyId)) {
+      return res.status(400).json({ message: 'Invalid companyId.' });
+    }
+
+    const filter = companyId ? { companyId: new mongoose.Types.ObjectId(companyId) } : {};
+    const products = await Product.find(filter).populate('companyId', 'companyName');
+
+    res.status(200).json({ success: true, count: products.length, data: products });
   } catch (error) {
+    console.error('[getAllProducts] error:', error);
     res.status(500).json({ error: error.message });
   }
 };

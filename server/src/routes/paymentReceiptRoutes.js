@@ -8,7 +8,11 @@ router.post('/', paymentReceiptController.createPaymentReceipt);
 // Reconcile a payment receipt (allocate it to invoices)
 router.post('/reconcile/:clientObjectId', paymentReceiptController.reconcileClientLedger);
 
-// Get all payment receipts for a client
-// router.get('/client/:clientId', paymentReceiptController.getPaymentReceiptsByClient);
+// Get all payment receipts (for admin overview)
+router.get('/', paymentReceiptController.getAllPaymentReceipts);
+
+// ★ ADDED HERE: Edit and Delete routes
+router.put('/:id', paymentReceiptController.updatePaymentReceipt);
+router.delete('/:id', paymentReceiptController.deletePaymentReceipt);
 
 module.exports = router;

@@ -1,221 +1,457 @@
+const mongoose = require('mongoose');
 const SalesInvoice = require('../models/SalesInvoice');
 const Product = require('../models/Product');
 const Batch = require('../models/Batch');
 const Client = require('../models/Client');
-const Counter = require('../models/Counter'); // Make sure you have this model!
+const Counter = require('../models/Counter');
+const Company = require('../models/Company');
+const { deductFifo, adjustLotConsumption } = require('../helpers/inventoryFifo');
 
-exports.createSalesInvoice = async (req, res) => {
+    exports.createSalesInvoice = async (req, res) => {
+    const session = await mongoose.startSession();
     try {
-        // 1. Destructure the bare minimum data from the frontend
-        const {
-            clientObjectId, billType, items, dispatchDetails
-        } = req.body;
-
-        // 2. THE SECURITY PRE-CHECK
+        const { clientObjectId, billType, items, globalDiscountType, globalDiscountValue } = req.body;
         if (!clientObjectId || !billType || !items || items.length === 0) {
-            return res.status(400).json({ 
-                message: "Missing required fields. Please ensure client, bill type, and items are provided." 
-            });
+            return res.status(400).json({ message: 'Missing required fields' });
         }
 
-        // 3. FETCH CLIENT (Auto-fill client details)
-        const client = await Client.findById(clientObjectId);
-        if (!client) {
-            return res.status(404).json({ message: "Client not found in database!" });
-        }
-        
-        const clientName = client.establishmentName;
-        const clientGSTIN = client.gstin;
+        let savedInvoice;
+        await session.withTransaction(async () => {
+            const client = await Client.findById(clientObjectId).session(session);
+            if (!client) throw new Error('Client not found');
 
-        // 4. AUTO-GENERATE INVOICE NUMBER
-        // Safely increments the counter in the DB to prevent duplicate invoice numbers
-        const counter = await Counter.findByIdAndUpdate(
-            'invoice_seq',
-            { $inc: { seq: 1 } },
-            { new: true, upsert: true }
-        );
-        
-        const seqString = String(counter.seq).padStart(3, '0'); // Turns 1 into "001"
-        const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
-        const currentYear = new Date().getFullYear();
-        const invoiceNumber = `MIL-${currentMonth}-${currentYear}-${seqString}`; // e.g., MIL-04-2026-001
-        const invoiceDate = new Date();
+            // Pre‑fetch all companies for shortCode lookup
+            const companies = await Company.find({}).session(session).select('shortCode');
+            const shortCodeMap = {};
+            companies.forEach(c => { shortCodeMap[c._id.toString()] = c.shortCode || ''; });
 
-        // Initialize backend-calculated totals
-        let calculatedTotalTaxable = 0;
-        let calculatedTotalCGST = 0;
-        let calculatedTotalSGST = 0;
-        let calculatedTotalIGST = 0;
+            const counter = await Counter.findByIdAndUpdate(
+                'invoice_seq',
+                { $inc: { seq: 1 } },
+                { new: true, upsert: true, session }
+            );
+            const seqStr = String(counter.seq).padStart(3, '0');
+            const month = String(new Date().getMonth() + 1).padStart(2, '0');
+            const year = new Date().getFullYear();
+            const invoiceNumber = `MIL-${month}-${year}-${seqStr}`;
+            const invoiceDate = new Date();
 
-        // 5. THE INVENTORY VALIDATION & MATH LOOP
-        for (let i = 0; i < items.length; i++) {
-            const currentItem = items[i];
-            
-            const batch = await Batch.findById(currentItem.batchId);
-            const product = await Product.findById(currentItem.productId);
+            let totalGross = 0, totalTaxable = 0, totalCGST = 0, totalSGST = 0, totalIGST = 0;
+            const processedItems = [];
 
-            if (!batch || !product) {
-                return res.status(404).json({ message: `Product or Batch missing for item ${i+1}` });
-            }
+            for (const item of items) {
+                const batch = await Batch.findById(item.batchId).session(session);
+                const product = await Product.findById(item.productId).session(session);
+                if (!batch || !product) throw new Error('Product or Batch missing');
 
-            if (batch.totalStockQuantity < currentItem.billedQty) {
-                return res.status(400).json({
-                    message: `Insufficient stock in Batch ${batch.batchNumber}. Need ${currentItem.billedQty}, have ${batch.totalStockQuantity}!`
+                // Look up short code
+                const companyShortCode = shortCodeMap[product.companyId?.toString()] || '';
+
+                const billedQty = item.billedQty || (item.chargeableQty + (item.freeQty || 0));
+                if (batch.totalStockQuantity < billedQty) {
+                    throw new Error(`Insufficient stock in Batch ${batch.batchNumber}`);
+                }
+
+                const free = item.freeQty || 0;
+                const chargeable = billedQty - free;
+                const gross = item.rate * chargeable;
+                let discAmount = item.discountAmount || 0;
+                const discPercent = item.discountPercent || 0;
+                if (discPercent > 0) discAmount = gross * discPercent / 100;
+                const taxable = gross - discAmount;
+                const gstRate = product.gstRate || 0;
+                const totalGST = taxable * gstRate / 100;
+                const cgst = totalGST / 2;
+                const sgst = totalGST / 2;
+                const igst = 0;
+
+                totalGross += gross;
+                totalTaxable += taxable;
+                totalCGST += cgst;
+                totalSGST += sgst;
+                totalIGST += igst;
+
+                const { lotConsumption } = await deductFifo(batch._id, billedQty, session);
+
+                processedItems.push({
+                    productId: item.productId,
+                    batchId: batch._id,
+                    productName: product.name,
+                    companyShortCode,                         // ★ added
+                    batchNumber: batch.batchNumber,
+                    packing: product.packing,
+                    hsn: product.hsnCode,
+                    expiryDate: batch.expiryDate,
+                    mrp: batch.mrp,
+                    billedQty,
+                    chargeableQty: chargeable,
+                    freeQty: free,
+                    rate: item.rate,
+                    grossAmount: gross,
+                    discountPercent: discPercent,
+                    discountAmount: discAmount,
+                    taxableValue: taxable,
+                    cgst,
+                    sgst,
+                    igst,
+                    lineTotal: taxable + totalGST,
+                    lotConsumption,
                 });
+
+                await Product.findByIdAndUpdate(item.productId, { $inc: { totalStock: -billedQty } }, { session });
             }
 
-            // --- AUTO-FILL BATCH & PRODUCT DATA ---
-            items[i].productName = product.name;
-            items[i].batchNumber = batch.batchNumber;
-            items[i].mrp = batch.mrp;
-            items[i].expiryDate = batch.expiryDate;
+            const totalGST = totalCGST + totalSGST + totalIGST;
+            let netAmount = totalTaxable + totalGST;
 
-            // --- CALCULATE CHARGEABLE QTY ---
-            const freeBoxes = currentItem.freeQty || 0;
-            const chargeableBoxes = currentItem.billedQty - freeBoxes;
-            items[i].chargeableQty = chargeableBoxes;
-
-            // --- ZERO-TRUST FINANCIAL CALCULATION ---
-            const itemGrossAmount = currentItem.rate * chargeableBoxes;
-            
-            let itemDiscountAmount = currentItem.discountAmount || 0;
-            const itemDiscountPercent = currentItem.discountPercent || 0;
-
-            if (itemDiscountPercent > 0) {
-                itemDiscountAmount = itemGrossAmount * (itemDiscountPercent / 100);
+            // Apply global discount
+            let globalDiscAmt = 0;
+            if (globalDiscountValue && globalDiscountValue > 0) {
+                if (globalDiscountType === 'percent') {
+                    globalDiscAmt = (netAmount * globalDiscountValue) / 100;
+                } else {
+                    globalDiscAmt = globalDiscountValue;
+                }
             }
+            netAmount -= globalDiscAmt;
+            const roundedNet = Math.round(netAmount);
+            const roundOff = parseFloat((roundedNet - netAmount).toFixed(2));
+            netAmount = roundedNet;
 
-            const itemTaxableValue = itemGrossAmount - itemDiscountAmount; 
-            
-            const productGSTRate = product.gstRate || 0; 
-            const itemTotalGST = itemTaxableValue * (productGSTRate / 100);
-
-            let itemCGST = 0, itemSGST = 0, itemIGST = 0;
-            const isInterState = false; // Hardcoded for now
-
-            if (isInterState) {
-                itemIGST = itemTotalGST; 
-            } else {
-                itemCGST = itemTotalGST / 2; 
-                itemSGST = itemTotalGST / 2;
+            const previousOutstanding = client.totalOutstanding || 0;
+            const previousOutstandingDate = client.outstandingDate || null;
+            let availableCredit = client.creditBalance || 0;
+            let creditApplied = 0;
+            if (availableCredit > 0) {
+                creditApplied = Math.min(availableCredit, netAmount);
+                client.creditBalance -= creditApplied;
             }
+            const totalPayable = netAmount - creditApplied;
+            const dueAmount = totalPayable;
 
-            // Overwrite frontend data with backend math
-            items[i].grossAmount = itemGrossAmount;
-            items[i].discountPercent = itemDiscountPercent; 
-            items[i].discountAmount = itemDiscountAmount;   
-            items[i].taxableValue = itemTaxableValue;
-            items[i].cgst = itemCGST;
-            items[i].sgst = itemSGST;
-            items[i].igst = itemIGST;
-            items[i].lineTotal = itemTaxableValue + itemTotalGST;
+            let paymentStatus = 'UNPAID';
+            if (dueAmount === 0) paymentStatus = 'PAID';
+            else if (creditApplied > 0) paymentStatus = 'PARTIALLY_PAID';
 
-            calculatedTotalTaxable += itemTaxableValue;
-            calculatedTotalCGST += itemCGST;
-            calculatedTotalSGST += itemSGST;
-            calculatedTotalIGST += itemIGST;
-        }
+            client.totalOutstanding = previousOutstanding + dueAmount;
 
-        const calculatedTotalGST = calculatedTotalCGST + calculatedTotalSGST + calculatedTotalIGST;
-        const calculatedNetAmount = calculatedTotalTaxable + calculatedTotalGST;
+            const oldestUnpaid = await SalesInvoice.findOne({
+                clientObjectId: client._id,
+                paymentStatus: { $in: ['UNPAID', 'PARTIALLY_PAID'] }
+            }).sort({ invoiceDate: 1 }).session(session);
+            client.outstandingDate = oldestUnpaid ? oldestUnpaid.invoiceDate : null;
 
-        // 6. APPLY CREDIT & CALCULATE DUE AMOUNT
-        const previousOutstanding = client.totalOutstanding || 0;
-        let availableCredit = client.creditBalance || 0;
-        let creditApplied = 0;
+            const newInvoice = new SalesInvoice({
+                clientName: client.establishmentName,
+                clientObjectId: client._id,
+                clientGSTIN: client.gstin,
+                clientBillingAddress: client.billingAddress,
+                clientDrugLicense: [client.drugLicense20B, client.drugLicense21B].filter(Boolean).join(', '),
+                invoiceNumber,
+                invoiceDate,
+                billType,
+                items: processedItems,
+                totalGrossAmount: totalGross,
+                totalTaxable,
+                totalCGST,
+                totalSGST,
+                totalIGST,
+                totalGST,
+                roundOff,
+                netAmount,
+                globalDiscountPercent: globalDiscountType === 'percent' ? globalDiscountValue : 0,
+                globalDiscountAmount: globalDiscAmt,
+                previousOutstanding,
+                previousOutstandingDate,
+                totalPayable,
+                creditApplied,
+                dueAmount,
+                paymentStatus,
+                invoiceStatus: 'FINALIZED',
+            });
 
-        if (availableCredit > 0) {
-            creditApplied = Math.min(availableCredit, calculatedNetAmount);
-            client.creditBalance -= creditApplied; 
-        }
-
-        const immutableTotalPayable = calculatedNetAmount - creditApplied;
-        const startingDueAmount = immutableTotalPayable; 
-
-        let paymentStatus = 'UNPAID';
-        if (startingDueAmount === 0) paymentStatus = 'PAID';
-        else if (creditApplied > 0) paymentStatus = 'PARTIALLY_PAID';
-
-        // Update Client Ledger
-        client.totalOutstanding = previousOutstanding + startingDueAmount;
-
-        // 7. CREATE THE INVOICE
-        const newInvoice = new SalesInvoice({
-            clientName,
-            clientObjectId,
-            clientGSTIN,
-            invoiceNumber,
-            invoiceDate,
-            billType,
-            items, 
-            dispatchDetails,
-            totalTaxable: calculatedTotalTaxable,
-            totalCGST: calculatedTotalCGST,
-            totalSGST: calculatedTotalSGST,
-            totalIGST: calculatedTotalIGST,
-            totalGST: calculatedTotalGST,
-            netAmount: calculatedNetAmount,
-            creditApplied: creditApplied,
-            previousOutstanding: previousOutstanding, 
-            totalPayable: immutableTotalPayable, 
-            dueAmount: startingDueAmount,        
-            paymentStatus: paymentStatus,
-            invoiceStatus: 'FINALIZED' 
+            await newInvoice.save({ session });
+            await client.save({ session });
+            savedInvoice = newInvoice;
         });
-
-        // 8. THE INVENTORY DEDUCTION LOOP
-        for (let i = 0; i < items.length; i++) {
-            const currentItem = items[i];
-            const stockDeducted = currentItem.billedQty;
-
-            await Batch.findByIdAndUpdate(currentItem.batchId, {
-                $inc: { totalStockQuantity: -stockDeducted }
-            });
-
-            await Product.findByIdAndUpdate(currentItem.productId, {
-                $inc: { totalStock: -stockDeducted }
-            });
-        }
-
-        // Save Invoice and Client 
-        await newInvoice.save();
-        await client.save();
 
         res.status(201).json({
-            message: `Sales Invoice ${invoiceNumber} generated successfully!`,
-            data: newInvoice
+            message: `Sales Invoice ${savedInvoice.invoiceNumber} generated successfully!`,
+            data: savedInvoice
         });
-
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error('createSalesInvoice error:', error);
+        res.status(error.message?.includes('Insufficient') ? 409 : 500).json({ message: error.message });
+    } finally {
+        await session.endSession();
     }
 };
 
-// Add this at the bottom of salesInvoiceController.js
-exports.getAllSalesInvoices = async (req, res) => {
+exports.updateSalesInvoice = async (req, res) => {
+    const session = await mongoose.startSession();
     try {
-        const invoices = await SalesInvoice.find();
+        const { id } = req.params;
+        const { billType, items: newItemsInput, globalDiscountType, globalDiscountValue } = req.body;
+
+        if (!newItemsInput || newItemsInput.length === 0) {
+            return res.status(400).json({ message: 'At least one item is required.' });
+        }
+
+        let updatedInvoice;
+        await session.withTransaction(async () => {
+            const invoice = await SalesInvoice.findById(id).session(session);
+            if (!invoice) throw new Error('Invoice not found');
+            if (invoice.invoiceStatus === 'CANCELLED') throw new Error('Cannot edit a cancelled invoice');
+
+            const client = await Client.findById(invoice.clientObjectId).session(session);
+            if (!client) throw new Error('Client not found');
+
+            // Pre‑fetch company short codes
+            const companies = await Company.find({}).session(session).select('shortCode');
+            const shortCodeMap = {};
+            companies.forEach(c => { shortCodeMap[c._id.toString()] = c.shortCode || ''; });
+
+            /* ── 1. FULL REVERSAL of original invoice ──────────────────── */
+            for (const origItem of invoice.items) {
+                await Batch.findByIdAndUpdate(
+                    origItem.batchId,
+                    { $inc: { totalStockQuantity: origItem.billedQty } },
+                    { session }
+                );
+                await Product.findByIdAndUpdate(
+                    origItem.productId,
+                    { $inc: { totalStock: origItem.billedQty } },
+                    { session }
+                );
+
+                // Restore individual purchase lots
+                if (origItem.lotConsumption && origItem.lotConsumption.length > 0) {
+                    for (const lot of origItem.lotConsumption) {
+                        await Batch.updateOne(
+                            { _id: origItem.batchId, "purchaseLots._id": lot.lotId },
+                            { $inc: { "purchaseLots.$.remainingQty": lot.qty } },
+                            { session }
+                        );
+                    }
+                }
+            }
+
+            // Reverse client ledger
+            client.totalOutstanding = (client.totalOutstanding || 0) - invoice.dueAmount;
+            client.creditBalance = (client.creditBalance || 0) + invoice.creditApplied;
+
+            /* ── 2. PROCESS the new items exactly like a create ────────── */
+            let totalGross = 0, totalTaxable = 0, totalCGST = 0, totalSGST = 0;
+            const processedItems = [];
+
+            for (const newItem of newItemsInput) {
+                const batch = await Batch.findById(newItem.batchId).session(session);
+                const product = await Product.findById(newItem.productId).session(session);
+                if (!batch || !product) throw new Error('Product or Batch missing');
+
+                const companyShortCode = shortCodeMap[product.companyId?.toString()] || '';
+
+                const billedQty = newItem.billedQty || (newItem.chargeableQty + (newItem.freeQty || 0));
+                if (batch.totalStockQuantity < billedQty) {
+                    throw new Error(`Insufficient stock in Batch ${batch.batchNumber}`);
+                }
+
+                const free = newItem.freeQty || 0;
+                const chargeable = billedQty - free;
+                const gross = newItem.rate * chargeable;
+                let discAmount = newItem.discountAmount || 0;
+                const discPercent = newItem.discountPercent || 0;
+                if (discPercent > 0) discAmount = gross * discPercent / 100;
+                const taxable = gross - discAmount;
+                const gstRate = product.gstRate || 0;
+                const totalGST = taxable * gstRate / 100;
+                const cgst = totalGST / 2;
+                const sgst = totalGST / 2;
+                const lineTotal = taxable + totalGST;
+
+                totalGross += gross;
+                totalTaxable += taxable;
+                totalCGST += cgst;
+                totalSGST += sgst;
+
+                const { lotConsumption } = await deductFifo(batch._id, billedQty, session);
+
+                processedItems.push({
+                    productId: newItem.productId,
+                    batchId: batch._id,
+                    productName: product.name,
+                    companyShortCode,                         // ★ fixed
+                    batchNumber: batch.batchNumber,
+                    packing: product.packing,
+                    hsn: product.hsnCode,
+                    expiryDate: batch.expiryDate,
+                    mrp: batch.mrp,
+                    billedQty,
+                    chargeableQty: chargeable,
+                    freeQty: free,
+                    rate: newItem.rate,
+                    grossAmount: gross,
+                    discountPercent: discPercent,
+                    discountAmount: discAmount,
+                    taxableValue: taxable,
+                    cgst,
+                    sgst,
+                    lineTotal,
+                    lotConsumption,
+                });
+
+                await Product.findByIdAndUpdate(newItem.productId, { $inc: { totalStock: -billedQty } }, { session });
+            }
+
+            const totalGST = totalCGST + totalSGST;
+            let netAmount = totalTaxable + totalGST;
+
+            // Apply global discount
+            let globalDiscAmt = 0;
+            if (globalDiscountValue && globalDiscountValue > 0) {
+                if (globalDiscountType === 'percent') {
+                    globalDiscAmt = (netAmount * globalDiscountValue) / 100;
+                } else {
+                    globalDiscAmt = globalDiscountValue;
+                }
+            }
+            netAmount -= globalDiscAmt;
+            const roundedNet = Math.round(netAmount);
+            const roundOff = parseFloat((roundedNet - netAmount).toFixed(2));
+            netAmount = roundedNet;
+
+            // Re‑calculate client credit
+            const previousOutstanding = client.totalOutstanding || 0;
+            const previousOutstandingDate = client.outstandingDate || null;
+            let availableCredit = client.creditBalance || 0;
+            let creditApplied = 0;
+            if (availableCredit > 0) {
+                creditApplied = Math.min(availableCredit, netAmount);
+                client.creditBalance -= creditApplied;
+            }
+            const totalPayable = netAmount - creditApplied;
+            const dueAmount = totalPayable;
+
+            let paymentStatus = 'UNPAID';
+            if (dueAmount === 0) paymentStatus = 'PAID';
+            else if (creditApplied > 0) paymentStatus = 'PARTIALLY_PAID';
+
+            client.totalOutstanding = previousOutstanding + dueAmount;
+            client.outstandingDate = new Date();
+
+            /* ── 3. Overwrite the invoice fields ──────────────────────── */
+            invoice.items = processedItems;
+            invoice.billType = billType || invoice.billType;
+            invoice.totalGrossAmount = totalGross;
+            invoice.totalTaxable = totalTaxable;
+            invoice.totalCGST = totalCGST;
+            invoice.totalSGST = totalSGST;
+            invoice.totalGST = totalGST;
+            invoice.roundOff = roundOff;
+            invoice.netAmount = netAmount;
+            invoice.globalDiscountPercent = globalDiscountType === 'percent' ? globalDiscountValue : 0;
+            invoice.globalDiscountAmount = globalDiscAmt;
+            invoice.previousOutstanding = previousOutstanding;
+            invoice.previousOutstandingDate = previousOutstandingDate;
+            invoice.totalPayable = totalPayable;
+            invoice.creditApplied = creditApplied;
+            invoice.dueAmount = dueAmount;
+            invoice.paymentStatus = paymentStatus;
+
+            await invoice.save({ session });
+            await client.save({ session });
+            updatedInvoice = invoice;
+        });
+
         res.status(200).json({
-            success: true,
-            count: invoices.length,
-            data: invoices
+            message: `Sales Invoice ${updatedInvoice.invoiceNumber} updated successfully!`,
+            data: updatedInvoice,
         });
     } catch (error) {
-        res.status(400).json({ message: error.message });
+        console.error('updateSalesInvoice error:', error);
+        res.status(error.message?.includes('Insufficient') ? 409 : 500).json({ message: error.message });
+    } finally {
+        await session.endSession();
+    }
+};
+
+exports.deleteSalesInvoice = async (req, res) => {
+    const session = await mongoose.startSession();
+    try {
+        const { id } = req.params;
+
+        let deleted;
+        await session.withTransaction(async () => {
+            const invoice = await SalesInvoice.findById(id).session(session);
+            if (!invoice) throw new Error('Invoice not found');
+
+            const client = await Client.findById(invoice.clientObjectId).session(session);
+            if (!client) throw new Error('Client not found');
+
+            // Reverse stock
+            for (const item of invoice.items) {
+                // Restore master stock
+                await Batch.findByIdAndUpdate(
+                    item.batchId,
+                    { $inc: { totalStockQuantity: item.billedQty } },
+                    { session }
+                );
+                await Product.findByIdAndUpdate(
+                    item.productId,
+                    { $inc: { totalStock: item.billedQty } },
+                    { session }
+                );
+
+                // ★ Restore individual purchase lots
+                if (item.lotConsumption && item.lotConsumption.length > 0) {
+                    for (const lot of item.lotConsumption) {
+                        await Batch.updateOne(
+                            { _id: item.batchId, "purchaseLots._id": lot.lotId },
+                            { $inc: { "purchaseLots.$.remainingQty": lot.qty } },
+                            { session }
+                        );
+                    }
+                }
+            }
+
+            // Reverse client ledger
+            client.totalOutstanding = (client.totalOutstanding || 0) - invoice.dueAmount;
+            client.creditBalance = (client.creditBalance || 0) + invoice.creditApplied;
+            await client.save({ session });
+
+            // Delete the invoice
+            await SalesInvoice.findByIdAndDelete(id).session(session);
+
+            deleted = invoice;
+        });
+
+        res.status(200).json({
+            message: `Invoice ${deleted.invoiceNumber} deleted and stock restored.`,
+            data: deleted,
+        });
+    } catch (error) {
+        console.error('deleteSalesInvoice error:', error);
+        res.status(500).json({ message: error.message });
+    } finally {
+        await session.endSession();
+    }
+};
+
+exports.getAllSalesInvoices = async (req, res) => {
+    try {
+        const invoices = await SalesInvoice.find().sort({ invoiceDate: -1 }).populate('clientObjectId', 'establishmentName city line');
+        res.status(200).json({ success: true, count: invoices.length, data: invoices });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
     }
 };
 
 exports.getSalesInvoiceById = async (req, res) => {
     try {
         const invoice = await SalesInvoice.findById(req.params.id);
-        if (!invoice) {
-            return res.status(404).json({ message: "Invoice not found" });
-        }
-        res.status(200).json({
-            success: true,
-            data: invoice
-        });
+        if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
+        res.status(200).json({ success: true, data: invoice });
     } catch (error) {
-        res.status(400).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     }
 };

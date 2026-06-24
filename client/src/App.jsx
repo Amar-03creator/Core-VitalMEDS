@@ -1,11 +1,11 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-
-import LandingPage from './pages/LandingPage';
-import LoginPage from './pages/LoginPage';     
-import RegisterPage from './pages/RegistrationPage';  
+import { Toaster } from 'sonner';
+import LandingPage from './pages/Public/landingPage';
+import LoginPage from './pages/Public/LoginPage';     
+import RegisterPage from './pages/Public/RegistrationPage';  
 
 // Client
-import ClientLayout from './pages/Client/ClientLayout';
+import ClientLayout from './layouts/ClientLayout/ClientLayout';
 import ClientDashboard from './pages/Client/ClientDashboard';
 import ClientProductsPage from './pages/Client/ClientProductsPage';
 import ClientInquiryPage from './pages/Client/ClientInquiryPage';
@@ -17,7 +17,7 @@ import ClientQuickReorderPage from './pages/Client/ClientQuickReorderPage';
 import ClientCart from './pages/Client/ClientCart';
 
 // Admin
-import AdminLayout from './pages/Admin/AdminLayout';
+import AdminLayout from './layouts/AdminLayout/AdminLayout';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import CustomersPage from './pages/Admin/CustomersPage';
 import InquiriesPage from './pages/Admin/InquiriesPage';
@@ -69,6 +69,7 @@ function App() {
           <Route path="expiry-offers" element={<ExpiryOffersPage />} />
         </Route>
       </Routes>
+      <Toaster position="top-right" richColors closeButton toastOptions={{ duration: 3000 , style: { fontSize: '18px' } }} />
     </Router>
   );
 }

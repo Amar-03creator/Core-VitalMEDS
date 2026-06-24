@@ -3,7 +3,13 @@ const mongoose = require('mongoose');
 
 const clientSchema = new mongoose.Schema({
     establishmentName: { type: String, required: true },
-    clientId: { type: String, required: true, unique: true }, // e.g., "CUST-1042"
+    clientId: {
+        type: String,
+        required: true,
+        unique: true,
+        uppercase: true,
+        match: /^[0-9A-Z]{3}$/,
+    },
     businessType: { type: String, enum: ['Retail', 'Hospital', 'Clinic'], required: true },
     status: {
         type: String,
@@ -12,16 +18,24 @@ const clientSchema = new mongoose.Schema({
     },
     deliveryRoute: String,
 
+    /*
+     * line — the sales route/territory this client belongs to (e.g.
+     * "Line 1", "Berhampur Town", "North Route"). Used by the Payments
+     * tab filter: selecting a line narrows the City dropdown to only
+     * cities that exist on that line, and narrows the Party dropdown
+     * to only clients on that line (optionally further narrowed by city).
+     */
+    line: { type: String, trim: true },
+
     contacts: [{
         name: { type: String, required: true },
-        cognitoId: String, // Links to AWS Cognito for login later. NO PASSWORDS HERE!
-        phone: { type: String, required: true },
+        cognitoId: String,
+        phone: { type: String },
         email: String,
-        // The new designation field with specific roles
-        designation: { 
-            type: String, 
+        designation: {
+            type: String,
             enum: ['Owner', 'Proprietor', 'Manager', 'Partner', 'Staff'],
-            required: true 
+            required: true
         },
         isPrimary: { type: Boolean, default: false },
         prefersWhatsApp: { type: Boolean, default: true }
@@ -30,23 +44,22 @@ const clientSchema = new mongoose.Schema({
     billingAddress: { type: String, required: true },
     shippingAddress: String,
     city: { type: String, required: true },
-    district: { type: String, required: true }, // New Field
+    district: { type: String, required: true },
     pincode: { type: String, required: true },
 
     gstin: {
         type: String,
         required: true,
         unique: true,
-        uppercase: true, // Forces GSTIN to always be uppercase
+        uppercase: true,
         minlength: 15,
         maxlength: 15
     },
     panNumber: String,
-    // New Aadhaar Field with basic validation
-    aadhaarNumber: { 
-        type: String, 
-        minlength: 12, 
-        maxlength: 12 
+    aadhaarNumber: {
+        type: String,
+        minlength: 12,
+        maxlength: 12
     },
     drugLicense20B: String,
     drugLicense21B: String,
@@ -55,26 +68,30 @@ const clientSchema = new mongoose.Schema({
     documentUrls: {
         gstCert: String,
         dlCert: String,
-        aadhaarCard: String // Added a slot for the uploaded Aadhaar image
+        aadhaarCard: String
     },
     documentsVerifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
     documentsVerifiedAt: Date,
     documentIssues: [String],
 
-    creditLimit: { type: Number, default: 0 },  // Maximum credit allowed by company policy
-    paymentTermsDays: { type: Number, default: 0 },  // Number of days allowed for payment after invoice date
+    creditLimit: { type: Number, default: 0 },
+    paymentTermsDays: { type: Number, default: 0 },
     defaultDiscountPercent: { type: Number, default: 0 },
-    creditScore: Number, // Calculated by our 0-100 algorithm
+    creditScore: Number,
 
     totalOutstanding: { type: Number, default: 0 },
-    outstandingDays: Number,      
+    outstandingDays: Number,
+    outstandingDate: { type: Date },
     creditBalance: { type: Number, default: 0 },
-    averagePaymentTime: Number,     
+    averagePaymentTime: Number,
     riskTier: { type: String, enum: ['Green', 'Yellow', 'Red'], default: 'Green' },
     partyTier: { type: String, enum: ['Diamond', 'Platinum', 'Gold', 'Silver'], default: 'Silver' },
 
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' }
 }, { timestamps: true });
+
+// Index for fast line/city filtering on the Payments tab
+clientSchema.index({ line: 1, city: 1 });
 
 module.exports = mongoose.model('Client', clientSchema);
