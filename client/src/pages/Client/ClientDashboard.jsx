@@ -2,13 +2,13 @@ import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 
 // Import all extracted components
-import PromoGrid from './components/PromoGrid';
-import MonthlySummary from './components/MonthlySummary';
-import CreditLimitUsage from './components/CreditLimitUsage';
-import Greeting from './components/Greeting';
-import PendingApprovalAlert from './components/PendingApprovalAlert';      // fixed name
-import TopProducts from './components/TopProducts';
-import RecentOrders from './components/RecentOrders';
+import PromoGrid from '../../features/Client/Dashboard/PromoGrid';
+import MonthlySummary from '../../features/Client/Dashboard/MonthlySummary';
+import CreditLimitUsage from '../../features/Client/Dashboard/CreditLimitUsage';
+import Greeting from '../../features/Client/Dashboard/Greeting';
+import PendingApprovalAlert from '../../features/Client/Dashboard/PendingApprovalAlert';      // fixed name
+import TopProducts from '../../features/Client/Dashboard/TopProducts';
+import RecentOrders from '../../features/Client/Dashboard/RecentOrders';
 
 /* ── DEMO DATA ── */
 const CLIENT = {
