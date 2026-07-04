@@ -10,4 +10,6 @@ router.post('/', productController.createProduct); // Hint: Method is POST, func
 // Define the GET road (Read)
 router.get('/', productController.getAllProducts); // Hint: Method is GET, function is getAllProducts
 
+router.put('/:id', productController.updateProduct); // Hint: Method is PUT, function is updateProduct
+
 module.exports = router;
