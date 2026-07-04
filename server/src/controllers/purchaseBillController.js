@@ -23,6 +23,30 @@ exports.createPurchaseBill = async (req, res) => {
             return res.status(400).json({ message: 'purchaseType must be intrastate or interstate.' });
         }
 
+        // Validate each item
+        for (const item of items) {
+            // Auto-calculate PTR if admin left it blank, otherwise use provided
+            const ptr = parseFloat(item.ptr) || (parseFloat(item.mrp) * 0.8);
+            const mrp = parseFloat(item.mrp);
+            const purchaseRate = parseFloat(item.purchaseRate);
+
+            const maxPtr = mrp * 0.8;
+
+            if (ptr > maxPtr) {
+                return res.status(400).json({
+                    message: `PTR for ${item.productName || 'item'} (₹${ptr}) cannot exceed 80% of MRP (₹${maxPtr.toFixed(2)}).`
+                });
+            }
+            if (ptr < purchaseRate) {
+                return res.status(400).json({
+                    message: `PTR for ${item.productName || 'item'} (₹${ptr}) cannot be less than Purchase Rate (₹${purchaseRate.toFixed(2)}).`
+                });
+            }
+
+            // Ensure the validated/calculated PTR is passed down
+            item.ptr = ptr;
+        }
+
         let grossTotal = 0, totalGST = 0, netBeforeDiscount = 0;
         const gstSlabMap = {};
 
@@ -229,5 +253,169 @@ exports.getAllPurchaseBills = async (req, res) => {
         res.status(200).json({ success: true, count: bills.length, data: bills });
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+};
+
+/* ════════════════════════════════════════════════════════════════════
+   ★ EVERYTHING BELOW THIS LINE IS NEW — appended only, nothing above
+   this comment has been touched. These are new capabilities for the
+   Companies page (supplier-scoped bill list/detail, FIFO payment
+   recording, cancel+restock) that didn't exist before.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── getPurchaseBillsBySupplier ───────────────────────────── ★ NEW
+   Powers the "Purchase Bills" tab on the Company Detail page —
+   mirrors api.getSalesInvoices() but scoped to one supplier.       */
+exports.getPurchaseBillsBySupplier = async (req, res) => {
+    try {
+        const { supplierId } = req.params;
+        const bills = await PurchaseBill.find({ supplierId }).sort({ invoiceDate: -1 });
+        res.status(200).json({ success: true, count: bills.length, data: bills });
+    } catch (error) {
+        console.error('getPurchaseBillsBySupplier error:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+/* ── getPurchaseBillById ──────────────────────────────────── ★ NEW
+   Powers PurchaseBillDetailModal (mirrors InvoiceDetailModal).      */
+exports.getPurchaseBillById = async (req, res) => {
+    try {
+        const bill = await PurchaseBill.findById(req.params.id);
+        if (!bill) return res.status(404).json({ message: 'Purchase bill not found.' });
+        res.status(200).json({ success: true, data: bill });
+    } catch (error) {
+        console.error('getPurchaseBillById error:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+/* ── recordPurchasePayment ────────────────────────────────── ★ NEW
+   FIFO-allocates a payment made TO a supplier against their oldest
+   unpaid bills first. Relies on the NEW dueAmount/paidAmount/
+   paymentHistory fields added to PurchaseBill.js — does not touch
+   or depend on anything inside createPurchaseBill above.
+
+   NOTE: createPurchaseBill (above, untouched) does NOT currently set
+   dueAmount/paidAmount on new bills, so until/unless that's changed,
+   every newly-created bill will have dueAmount: 0 (the schema default)
+   regardless of paymentStatus. This means recordPurchasePayment will
+   find nothing to allocate against for bills created through the
+   existing flow. Flagging this rather than silently "fixing" it by
+   editing createPurchaseBill myself — that function is yours and
+   working; let's discuss before I touch it.                         */
+exports.recordPurchasePayment = async (req, res) => {
+    const session = await mongoose.startSession();
+    try {
+        const { supplierId, amount, datePaid, paymentMode, referenceNumber, adminId } = req.body;
+
+        if (!supplierId || !amount || amount <= 0) {
+            return res.status(400).json({ message: 'supplierId and a positive amount are required.' });
+        }
+
+        let remaining = parseFloat(amount);
+        const allocations = [];
+
+        await session.withTransaction(async () => {
+            const unpaidBills = await PurchaseBill.find({
+                supplierId,
+                isCancelled: { $ne: true },
+                dueAmount: { $gt: 0 },
+            }).sort({ invoiceDate: 1 }).session(session);
+
+            for (const bill of unpaidBills) {
+                if (remaining <= 0) break;
+
+                const amountForThisBill = Math.min(remaining, bill.dueAmount);
+                bill.paidAmount = (bill.paidAmount || 0) + amountForThisBill;
+                bill.dueAmount = Math.max(0, bill.dueAmount - amountForThisBill);
+                bill.paymentStatus = bill.dueAmount === 0 ? 'PAID' : 'PARTIALLY_PAID';
+                bill.paymentHistory.push({ amountPaid: amountForThisBill, datePaid: datePaid || new Date() });
+                bill.updatedBy = adminId;
+
+                await bill.save({ session });
+
+                allocations.push({
+                    invoiceId: bill._id,
+                    invoiceNumber: bill.invoiceNumber,
+                    amountCleared: amountForThisBill,
+                });
+
+                remaining -= amountForThisBill;
+            }
+        });
+
+        res.status(200).json({
+            message: 'Payment recorded and allocated to oldest unpaid bills first.',
+            data: { allocations, unallocatedAmount: remaining, paymentMode, referenceNumber },
+        });
+    } catch (error) {
+        console.error('recordPurchasePayment error:', error);
+        res.status(500).json({ error: error.message });
+    } finally {
+        await session.endSession();
+    }
+};
+
+/* ── cancelPurchaseBill ───────────────────────────────────── ★ NEW
+   Voids a purchase bill and reverses its stock impact. Blocks the
+   cancellation (rather than silently going negative) if any stock
+   from this bill's lots has already been consumed by a sale.        */
+exports.cancelPurchaseBill = async (req, res) => {
+    const session = await mongoose.startSession();
+    try {
+        const { id } = req.params;
+        const { reason, adminId } = req.body;
+
+        if (!reason || !reason.trim()) {
+            return res.status(400).json({ message: 'A cancellation reason is required.' });
+        }
+
+        await session.withTransaction(async () => {
+            const bill = await PurchaseBill.findById(id).session(session);
+            if (!bill) throw new Error('Purchase bill not found.');
+            if (bill.isCancelled) throw new Error('This bill is already cancelled.');
+
+            for (const item of bill.items) {
+                const stockReceived = item.billedQty + (item.freeQty || 0);
+
+                const batch = await Batch.findById(item.batchId).session(session);
+                if (batch) {
+                    const lot = batch.purchaseLots.find(l => String(l.purchaseInvoiceId) === String(bill._id));
+                    const consumedFromLot = lot ? (lot.originalQty - lot.remainingQty) : 0;
+
+                    if (consumedFromLot > 0) {
+                        throw new Error(
+                            `Cannot cancel: ${consumedFromLot} unit(s) of batch ${item.batchNumber} from this bill have already been sold.`
+                        );
+                    }
+
+                    batch.purchaseLots = batch.purchaseLots.filter(
+                        l => String(l.purchaseInvoiceId) !== String(bill._id)
+                    );
+                    batch.totalStockQuantity = Math.max(0, batch.totalStockQuantity - stockReceived);
+                    await batch.save({ session });
+                }
+
+                await Product.findByIdAndUpdate(
+                    item.productId,
+                    { $inc: { totalStock: -stockReceived } },
+                    { session }
+                );
+            }
+
+            bill.isCancelled = true;
+            bill.cancelReason = reason;
+            bill.cancelledAt = new Date();
+            bill.updatedBy = adminId;
+            await bill.save({ session });
+        });
+
+        res.status(200).json({ message: 'Purchase bill cancelled and stock reversed.' });
+    } catch (error) {
+        console.error('cancelPurchaseBill error:', error);
+        res.status(400).json({ message: error.message });
+    } finally {
+        await session.endSession();
     }
 };

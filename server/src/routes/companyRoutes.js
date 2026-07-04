@@ -1,14 +1,24 @@
 const express = require('express');
+const router = express.Router();
+const {
+    createCompany,
+    getAllCompanies,
+    getCompanyById,
+    updateCompany,
+    toggleCompanyStatus,
+} = require('../controllers/companyController');
 
-// 1. Create an Express Router instance
-const router = express.Router(); 
+// GET /api/companies            -> list all suppliers (+ outstanding stats)
+// POST /api/companies           -> create a new supplier
+router.get('/', getAllCompanies);
+router.post('/', createCompany);
 
-// 2. Import the controller we just built
-const companyController = require('../controllers/companyController'); 
+// GET /api/companies/:id        -> single supplier (360° view)
+// PUT /api/companies/:id        -> update supplier profile
+router.get('/:id', getCompanyById);
+router.put('/:id', updateCompany);
 
-// 3. Define the route. 
-// When a POST request hits the root ('/'), run the createCompany function
-router.post('/', companyController.createCompany); 
-router.get('/', companyController.getAllCompanies); // 4. Export this router so that it can be used in server.js
+// PATCH /api/companies/:id/status  -> toggle Active/Inactive
+router.patch('/:id/status', toggleCompanyStatus);
 
 module.exports = router;

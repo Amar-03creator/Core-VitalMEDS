@@ -1,14 +1,29 @@
 const express = require('express');
+const router = express.Router();
+const {
+    createPurchaseBill,
+    getAllPurchaseBills,
+    getPurchaseBillsBySupplier,
+    getPurchaseBillById,
+    recordPurchasePayment,
+    cancelPurchaseBill,
+} = require('../controllers/purchaseBillController');
 
-// 1. Create an Express Router instance
-const router = express.Router(); 
+// POST /api/purchase-bills                       -> create (existing)
+// GET  /api/purchase-bills                       -> list all (existing)
+router.post('/', createPurchaseBill);
+router.get('/', getAllPurchaseBills);
 
-// 2. Import the controller we just built
-const purchaseBillController = require('../controllers/purchaseBillController'); 
+// GET  /api/purchase-bills/supplier/:supplierId  -> ★ NEW, powers Purchase Bills tab
+router.get('/supplier/:supplierId', getPurchaseBillsBySupplier);
 
-// 3. Define the route. 
-// When a POST request hits the root ('/'), run the createPurchaseBill function
-router.post('/', purchaseBillController.createPurchaseBill); 
-router.get('/', purchaseBillController.getAllPurchaseBills); // 4. Export this router so that it can be used in server.js
+// POST /api/purchase-bills/payments              -> ★ NEW, FIFO payment against a supplier's bills
+router.post('/payments', recordPurchasePayment);
+
+// GET  /api/purchase-bills/:id                   -> ★ NEW, single bill detail
+router.get('/:id', getPurchaseBillById);
+
+// PATCH /api/purchase-bills/:id/cancel           -> ★ NEW, void + restock reversal
+router.patch('/:id/cancel', cancelPurchaseBill);
 
 module.exports = router;
