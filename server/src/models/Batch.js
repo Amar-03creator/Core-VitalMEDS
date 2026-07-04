@@ -34,11 +34,14 @@ const batchSchema = new mongoose.Schema({
 
 batchSchema.index({ productId: 1, batchNumber: 1, companyId: 1 }, { unique: true });
 
-batchSchema.pre('save', function (next) {
+// ★ FIX: Switched to async function and removed 'next'
+batchSchema.pre('save', async function () {
     if (this.expiryDate) {
         const daysToExpiry = Math.ceil((this.expiryDate - new Date()) / (1000 * 60 * 60 * 24));
         this.nearExpiry = daysToExpiry <= (this.shortExpiryThreshold || 90);
     }
 });
+
+module.exports = mongoose.model('Batch', batchSchema);
 
 module.exports = mongoose.model('Batch', batchSchema);
