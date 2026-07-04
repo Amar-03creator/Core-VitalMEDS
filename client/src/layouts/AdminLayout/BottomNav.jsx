@@ -1,4 +1,4 @@
-// components/Admin/Layout/BottomNav.jsx
+// src/layouts/AdminLayout/BottomNav.jsx
 import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Users, ShoppingCart, Package, Layers } from 'lucide-react';
 
@@ -15,7 +15,7 @@ export const BottomNav = () => {
   const isActive = (path, exact) => exact ? location.pathname === path : location.pathname.startsWith(path);
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900 border-t border-slate-700/50 flex items-center justify-around py-2">
+    <div data-app-bottom-nav className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900 border-t border-slate-700/50 flex items-center justify-around py-2">
       {bottomNavItems.map(({ to, label, icon: Icon, exact }) => {
         const active = isActive(to, exact);
         return (

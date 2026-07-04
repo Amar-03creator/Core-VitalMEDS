@@ -1,23 +1,16 @@
+// client/src/features/Admin/BillingPage/components/LedgersTab.jsx
 import { useState, useMemo, useEffect } from 'react';
 import { Search, SlidersHorizontal, ChevronDown, Download, Printer, XIcon } from 'lucide-react';
 import { api } from '../../../../services/api';
 import { toast } from 'sonner';
 import { Spinner } from '@/components/ui/spinner';
 import { LedgerFilterPanel } from '../modals/LedgerFilterPanel';
-// Ensure this path matches exactly where your pdf generator is saved
-import { downloadLedgerPDF, printLedgerPDF } from '../pdf/ledger';
+import { downloadLedgerPDF, printLedgerPDF } from '@/components/ledgers/ledgerPDF';
+import { WhatsAppReminder } from '@/components/ledgers/WhatsAppReminder';
+import { LedgerTable } from '@/components/ledgers/LedgerTable';
+import { LedgerActions } from '@/components/ledgers/LedgerActions';
 
 const STORAGE_KEY = 'ledgersTabState';
-
-const formatIndianDate = (dateStr) => {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return dateStr;
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const yy = String(d.getFullYear()).slice(-2);
-  return `${dd}-${mm}-${yy}`;
-};
 
 export const LedgersTab = () => {
   const loadState = () => { try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY)); } catch { return null; } };
@@ -166,7 +159,7 @@ export const LedgersTab = () => {
         </button>
       </div>
 
-      {/* ★ BIG BULK ACTION BUTTONS ★ */}
+      {/* BIG BULK ACTION BUTTONS */}
       <div className="bg-white rounded-2xl border border-slate-200 p-3 space-y-2">
         <div className="flex items-center justify-between px-1">
           <p className="text-slate-500 text-xs font-medium">Statement For: <span className="font-bold text-slate-700">{getFilterLabel()}</span></p>
@@ -231,54 +224,25 @@ export const LedgersTab = () => {
                 {/* Accordion Body (Expanded Ledger) */}
                 {isExpanded && (
                   <div className="px-3 pb-4 pt-1 bg-slate-50 border-t border-slate-100">
-                    
-                    {!isCleared && (
-                      <a href={`https://wa.me/?text=${encodeURIComponent(`Dear ${a.party}, your outstanding balance of ₹${a.outstanding.toLocaleString('en-IN')} for bills older than ${a.days} days is pending. Kindly clear the dues. - Mila Agencies.`)}`}
-                        target="_blank" rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-1.5 text-sm font-bold text-emerald-700 bg-emerald-100/50 border border-emerald-200 py-2 rounded-xl hover:bg-emerald-100 transition-colors mb-3 mt-2">
-                        📱 Send WhatsApp Reminder
-                      </a>
-                    )}
 
-                    <div className="rounded-xl border border-slate-200 bg-white overflow-hidden mb-3">
-                      <div className="grid grid-cols-[55px_1fr_60px_60px_70px_35px] px-2 py-2 bg-slate-900 text-[9px] font-bold text-slate-300 uppercase tracking-wide gap-1 items-center">
-                        <span>Date</span><span>Particulars</span>
-                        <span className="text-right">Dr(₹)</span><span className="text-right">Cr(₹)</span>
-                        <span className="text-right">Balance</span><span className="text-right">Days</span>
-                      </div>
-                      
-                      {a.rows.map((row, i) => (
-                        <div key={i} className={`grid grid-cols-[55px_1fr_60px_60px_70px_35px] px-2 py-2 border-t border-slate-100 text-xs gap-1 items-center
-                          ${row.isOpening ? 'bg-amber-50' : row.isClosing ? 'bg-slate-900' : ''}`}>
-                          <span className={`text-[10px] font-medium ${row.isClosing ? 'text-slate-400' : 'text-slate-500'}`}>
-                            {formatIndianDate(row.date)}
-                          </span>
-                          <div className="min-w-0 pr-1">
-                            <p className={`font-semibold truncate text-[11px] ${row.isOpening ? 'text-amber-800' : row.isClosing ? 'text-white' : 'text-slate-800'}`}>{row.type}</p>
-                            <p className="text-slate-400 font-mono text-[9px] truncate">{row.voucher}</p>
-                          </div>
-                          <span className="text-right font-semibold text-red-600 text-[11px]">{row.dr > 0 ? row.dr.toLocaleString('en-IN') : ''}</span>
-                          <span className="text-right font-semibold text-emerald-600 text-[11px]">{row.cr > 0 ? row.cr.toLocaleString('en-IN') : ''}</span>
-                          <span className={`text-right font-bold text-[11px] ${row.isOpening ? 'text-amber-700' : row.isClosing ? 'text-emerald-400' : 'text-slate-900'}`}>
-                            {Math.abs(row.balance).toLocaleString('en-IN')} {row.balance >= 0 ? 'Dr' : 'Cr'}
-                          </span>
-                          <span className="text-right text-[10px] font-medium text-slate-500">{row.days ?? '—'}</span>
-                        </div>
-                      ))}
+                    {/* WhatsApp reminder – shared component */}
+                    <div className="mb-3 mt-2">
+                      <WhatsAppReminder
+                        partyName={a.party}
+                        outstanding={a.outstanding}
+                        days={a.days}
+                      />
                     </div>
 
-                    {/* ★ BIG INDIVIDUAL ACTION BUTTONS ★ */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); printLedgerPDF([a], filters.from, filters.to); }} 
-                        className="w-full flex items-center justify-center gap-1.5 bg-white border border-slate-300 text-slate-700 font-semibold py-2.5 rounded-xl text-sm hover:bg-slate-50 transition-colors">
-                        <Printer size={15} /> Print
-                      </button>
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); downloadLedgerPDF([a], filters.from, filters.to); }} 
-                        className="w-full flex items-center justify-center gap-1.5 bg-slate-900 text-white font-semibold py-2.5 rounded-xl text-sm hover:bg-slate-800 transition-colors">
-                        <Download size={15} /> Download PDF
-                      </button>
+                    {/* Ledger table – shared component */}
+                    <LedgerTable rows={a.rows} />
+
+                    {/* Print / Download actions – shared component */}
+                    <div className="mt-3">
+                      <LedgerActions
+                        onPrint={() => printLedgerPDF([a], filters.from, filters.to)}
+                        onDownload={() => downloadLedgerPDF([a], filters.from, filters.to)}
+                      />
                     </div>
                   </div>
                 )}

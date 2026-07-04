@@ -1,8 +1,8 @@
 import { Package, Wallet, FileText } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { MakeInvoiceModal } from '../../Admin/BillingPage/modals/MakeInvoiceModal';
-import { PaymentModal } from '../BillingPage/modals/Receipt/PaymentModal';
-import { PurchaseEntryModal } from '../../Admin/BillingPage/modals/AddPurchaseBillModal/PurchaseEntryModal'; // corrected path
+import { MakeInvoiceModal } from '../../../modals/MakeInvoiceModal';
+import { PaymentModal } from '../../../components/payments/PaymentModal';
+import { PurchaseEntryModal } from '../../../modals/AddPurchaseBillModal/PurchaseEntryModal'; // corrected path
 import { PRODUCT_CATALOG } from '../../Admin/BillingPage/utils/constants';
 import { api } from '../../../services/api';
 import { toast } from 'sonner';

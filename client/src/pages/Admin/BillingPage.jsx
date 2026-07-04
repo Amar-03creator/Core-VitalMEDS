@@ -5,7 +5,7 @@ import { PaymentsTab } from '../../features/Admin/BillingPage/components/Payment
 import { LedgersTab } from '../../features/Admin/BillingPage/components/LedgersTab'; 
 import { PurchasesTab } from '../../features/Admin/BillingPage/components/PurchasesTab';
 import { GSTModal } from '../../features/Admin/BillingPage/modals/GSTModal';
-import { MakeInvoiceModal } from '../../features/Admin/BillingPage/modals/MakeInvoiceModal';
+import { MakeInvoiceModal } from '../../modals/MakeInvoiceModal';
 
 const STORAGE_KEY = 'billingActiveTab';
 
@@ -18,14 +18,7 @@ const BillingPage = () => {
   });
 
   const [showGST, setShowGST] = useState(false);
-  const [showMakeInvoice, setShowMakeInvoice] = useState(() => {
-    try {
-      const saved = sessionStorage.getItem('makeInvoiceState');
-      return !!saved;
-    } catch {
-      return false;
-    }
-  });
+  const [showMakeInvoice, setShowMakeInvoice] = useState(false);
 
   // Persist active tab
   useEffect(() => {

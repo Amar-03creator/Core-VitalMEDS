@@ -170,3 +170,7 @@ input[type="number"]::-webkit-outer-spin-button {
     @apply font-sans;
   }
 }
+body.modal-backdrop-lock [data-app-top-nav],
+body.modal-backdrop-lock [data-app-bottom-nav] {
+  pointer-events: none;
+}

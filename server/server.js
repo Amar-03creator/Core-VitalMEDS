@@ -34,6 +34,10 @@ const productBatchRoutes = require('./src/routes/productBatchRoutes');
 const ledgerRoutes = require('./src/routes/ledgerRoutes');
 const dashboardRoutes = require('./src/routes/dashboardRoutes');
 const auditRoutes = require('./src/routes/auditRoutes');
+const replenishmentRoutes = require('./src/routes/replenishmentRoutes');
+const debitNoteRoutes = require('./src/routes/debitNoteRoutes');
+
+
 
 
 // Tell Express: "If a URL starts with /api/companies, send it to the companyRoutes file"
@@ -50,6 +54,11 @@ app.use('/api/products-with-batches', productBatchRoutes);
 app.use('/api/ledger', ledgerRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/audit', require('./src/routes/auditRoutes'));
+app.use('/api/replenishment', replenishmentRoutes);
+app.use('/api/debit-notes', debitNoteRoutes);
+
+
+
 
 // Create a basic test route (an endpoint)
 // When a browser or frontend sends a GET request to the root URL ('/'), run this function.

@@ -86,7 +86,7 @@ export const SideDrawer = ({ open, onClose, currentPath }) => {
                       <Link
                         key={to}
                         to={to}
-                        onClick={onClose}
+                        // onClick={onClose}
                         className={`group flex items-center gap-3.5 px-3 py-3 rounded-xl transition-all duration-150 relative overflow-hidden
                           ${active ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:text-white hover:bg-white/5'}`}
                       >
@@ -106,7 +106,10 @@ export const SideDrawer = ({ open, onClose, currentPath }) => {
 
           {/* Footer */}
           <div className="px-4 pb-8 pt-3 border-t border-white/10 space-y-2">
-            <Link to="/admin-dashboard/settings" onClick={onClose} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 transition-all">
+            <Link 
+            to="/admin-dashboard/settings" 
+            // onClick={onClose} 
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 transition-all">
               <Settings size={16} />
               <span className="text-sm font-medium">Settings</span>
             </Link>

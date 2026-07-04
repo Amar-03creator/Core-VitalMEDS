@@ -2,9 +2,9 @@
 import { useState, useEffect } from 'react';
 import { Plus, ShoppingCart, Building2, Package } from 'lucide-react';
 import { PURCHASE_BILLS, STATUS_CFG } from '../utils/constants';
-import { AddCompanyModal } from '../modals/AddCompanyModal/index';
-import { AddProductModal } from '../modals/AddProductModal/index';
-import { PurchaseEntryModal } from '../modals/AddPurchaseBillModal/PurchaseEntryModal';
+import { AddCompanyModal } from '../../../../modals/AddCompanyModal/index';
+import { AddProductModal } from '../../../../modals/AddProductModal/index';
+import { PurchaseEntryModal } from '../../../../modals/AddPurchaseBillModal/PurchaseEntryModal';
 import { api } from '../../../../services/api';
 import { toast } from 'sonner';
 
@@ -22,8 +22,8 @@ export const PurchasesTab = () => {
       const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY));
       return {
         showPurchaseEntry: saved?.showPurchaseEntry ?? false,
-        showAddCompany:    saved?.showAddCompany    ?? false,
-        showAddProduct:    saved?.showAddProduct    ?? false,
+        showAddCompany: saved?.showAddCompany ?? false,
+        showAddProduct: saved?.showAddProduct ?? false,
       };
     } catch {
       return { showPurchaseEntry: false, showAddCompany: false, showAddProduct: false };
@@ -80,11 +80,7 @@ export const PurchasesTab = () => {
 
   const handlePurchaseEntryClose = () => {
     setShowPurchaseEntry(false);
-    // Also remove purchase‑entry internal state if needed (handled inside its own modal)
-    sessionStorage.removeItem('purchaseEntryData');
   };
-
-  // ... rest of the component unchanged ...
 
   return (
     <div className="space-y-4">

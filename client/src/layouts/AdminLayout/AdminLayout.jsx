@@ -4,16 +4,20 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { TopNav } from './TopNav';
 import { BottomNav } from './BottomNav';
 import { SideDrawer } from './SideDrawer';
+import { useEnsureDashboardFallback } from '../../hooks/useEnsureDashboardFallback';
 
 const AdminLayout = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [messagesOpen, setMessagesOpen] = useState(false);
   const location = useLocation();
+  
+  useEnsureDashboardFallback('/admin-dashboard');
 
   useEffect(() => {
     setNotifOpen(false);
     setMessagesOpen(false);
+    setMenuOpen(false);
   }, [location.pathname]);
 
   return (

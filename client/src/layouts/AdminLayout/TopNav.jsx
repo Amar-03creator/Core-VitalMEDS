@@ -1,4 +1,4 @@
-// components/Admin/Layout/TopNav.jsx
+// src/layouts/AdminLayout/TopNav.jsx
 import { Pill, MessageSquare, Bell } from 'lucide-react';
 import { HamburgerButton } from './components/HamburgerButton';
 import { NotificationsDropdown } from './components/NotificationsDropdown';
@@ -10,7 +10,7 @@ export const TopNav = ({ menuOpen, setMenuOpen, notifOpen, setNotifOpen, message
   const totalUnreadTickets = demoTickets.filter(t => t.unread).length;
 
   return (
-    <nav className="sticky top-0 z-[70] bg-slate-900 shadow-md">
+    <nav data-app-top-nav className="sticky top-0 z-[70] bg-slate-900 shadow-md">
       <div className="flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/30">

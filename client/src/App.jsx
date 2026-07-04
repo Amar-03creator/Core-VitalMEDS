@@ -1,8 +1,16 @@
+// src/App.jsx
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'sonner';
+
+// 1. IMPORT THE NEW DATA PROVIDER
+import { ReferenceDataProvider } from './context/ReferenceDataContext'; 
+
+// (Delete the old NavStackProvider import)
+// import { NavStackProvider } from './context/NavStackContext'; 
+
 import LandingPage from './pages/Public/landingPage';
-import LoginPage from './pages/Public/LoginPage';     
-import RegisterPage from './pages/Public/RegistrationPage';  
+import LoginPage from './pages/Public/LoginPage';
+import RegisterPage from './pages/Public/RegistrationPage';
 
 // Client
 import ClientLayout from './layouts/ClientLayout/ClientLayout';
@@ -34,42 +42,43 @@ import ExpiryOffersPage from './pages/Admin/ExpiryOffersPage';
 function App() {
   return (
     <Router>
-      <Routes>
-        {/* Public routes */}
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<LoginPage />} />      
-        <Route path="/register" element={<RegisterPage />} /> 
+      {/* 2. WRAP YOUR ROUTES IN THE REFERENCE DATA PROVIDER */}
+      <ReferenceDataProvider>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
 
-        {/* ── CLIENT ROUTES (require auth – later) ── */}
-        <Route path="/client-dashboard" element={<ClientLayout />}>
-          <Route index element={<ClientDashboard />} />
-          <Route path="products" element={<ClientProductsPage />} />
-          <Route path="inquiry" element={<ClientInquiryPage />} />
-          <Route path="orders" element={<ClientOrdersPage />} />
-          <Route path="billing" element={<ClientBillingPage />} />
-          <Route path="support" element={<ClientSupportPage />} />
-          <Route path="notifications" element={<ClientNotificationsPage />} />
-          <Route path="quick-reorder" element={<ClientQuickReorderPage />} />
-          <Route path="cart" element={<ClientCart />} />
-        </Route>
+          <Route path="/client-dashboard" element={<ClientLayout />}>
+            <Route index element={<ClientDashboard />} />
+            <Route path="products" element={<ClientProductsPage />} />
+            <Route path="inquiry" element={<ClientInquiryPage />} />
+            <Route path="orders" element={<ClientOrdersPage />} />
+            <Route path="billing" element={<ClientBillingPage />} />
+            <Route path="support" element={<ClientSupportPage />} />
+            <Route path="notifications" element={<ClientNotificationsPage />} />
+            <Route path="quick-reorder" element={<ClientQuickReorderPage />} />
+            <Route path="cart" element={<ClientCart />} />
+          </Route>
 
-        {/* ── ADMIN ROUTES ── */}
-        <Route path="/admin-dashboard" element={<AdminLayout />}>
-          <Route index element={<AdminDashboard />} />
-          <Route path="customers" element={<CustomersPage />} />
-          <Route path="inquiries" element={<InquiriesPage />} />
-          <Route path="orders" element={<OrdersPage />} />
-          <Route path="inventory" element={<InventoryPage />} />
-          <Route path="products" element={<ProductsPage />} />
-          <Route path="companies" element={<CompaniesPage />} />
-          <Route path="billing" element={<BillingPage />} />
-          <Route path="analytics" element={<AnalyticsPage />} />
-          <Route path="support" element={<SupportPage />} />
-          <Route path="notifications" element={<NotificationsPage />} />
-          <Route path="expiry-offers" element={<ExpiryOffersPage />} />
-        </Route>
-      </Routes>
-      <Toaster position="top-right" richColors closeButton toastOptions={{ duration: 3000 , style: { fontSize: '18px' } }} />
+          <Route path="/admin-dashboard" element={<AdminLayout />}>
+            <Route index element={<AdminDashboard />} />
+            <Route path="customers" element={<CustomersPage />} />
+            <Route path="customers/:id" element={<CustomersPage />} />
+            <Route path="inquiries" element={<InquiriesPage />} />
+            <Route path="orders" element={<OrdersPage />} />
+            <Route path="inventory" element={<InventoryPage />} />
+            <Route path="products" element={<ProductsPage />} />
+            <Route path="companies" element={<CompaniesPage />} />
+            <Route path="billing" element={<BillingPage />} />
+            <Route path="analytics" element={<AnalyticsPage />} />
+            <Route path="support" element={<SupportPage />} />
+            <Route path="notifications" element={<NotificationsPage />} />
+            <Route path="expiry-offers" element={<ExpiryOffersPage />} />
+          </Route>
+        </Routes>
+        <Toaster position="top-right" richColors closeButton toastOptions={{ duration: 3000, style: { fontSize: '18px' } }} />
+      </ReferenceDataProvider>
     </Router>
   );
 }

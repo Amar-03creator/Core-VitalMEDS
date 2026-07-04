@@ -1,15 +1,16 @@
-// InvoicesTab.jsx
+// BillingPage/components/InvoicesTab.jsx
 import { useState, useMemo, useEffect } from 'react';
 import {
   Plus, Search, SlidersHorizontal, MapPin, Users, FileDown,
   ChevronLeft, ChevronRight, RotateCcw, X, ChevronUp
 } from 'lucide-react';
 import { STATUS_CFG } from '../utils/constants';
-import { InvoiceDetailModal } from '../modals/InvoiceDetailModal';
+import { InvoiceDetailModal } from '../../../../components/invoices/InvoiceDetailModal';
 import { InvoiceFilterPanel } from '../modals/InvoiceFilterPanel';
 import { api } from '../../../../services/api';
 import { toast } from 'sonner';
 import { Spinner } from '@/components/ui/spinner';
+import { InvoiceCard } from '../../../../components/invoices/InvoiceCard';
 
 const STORAGE_KEY = 'invoicesTabState';
 const FILTERABLE_KEYS = ['status', 'line', 'city', 'party', 'from', 'to'];
@@ -102,7 +103,7 @@ export const InvoicesTab = ({ onGST, onMakeInvoice }) => {
         inv.id.slice(-3).includes(s)
       );
     }
-    
+
     if (filters.status && filters.status !== 'All') list = list.filter(inv => inv.status === filters.status);
     if (filters.line) list = list.filter(inv => inv.line === filters.line);
     if (filters.city) list = list.filter(inv => inv.city === filters.city);
@@ -215,68 +216,15 @@ export const InvoicesTab = ({ onGST, onMakeInvoice }) => {
 
       <div className="space-y-5">
         {pageData.length === 0 ? (
-          <div className="py-12 text-center text-slate-500 text-base bg-white rounded-2xl border border-slate-200">
-            No invoices found
-          </div>
+          <div className="py-12 text-center ...">No invoices found</div>
         ) : (
-          pageData.map(inv => {
-            const { pill, label } = STATUS_CFG[inv.status] || { pill: 'bg-slate-100', label: inv.status };
-            const showLate = inv.overdueDays > 0;
-
-            return (
-              <button
-                key={inv._id}
-                onClick={() => setSelectedInv(inv)}
-                className="w-full text-left bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] p-4 pb-1 space-y-2 relative"
-              >
-                <span className="absolute -top-2 left-1/2 -translate-x-1/2 z-10 text-md font-bold px-3 py-0 rounded-full border border-slate-100 shadow-sm bg-white text-slate-700">
-                  {inv.billType === 'Cash' ? '💵 Cash' : '📋 Credit'}
-                </span>
-
-                <span className={`absolute -bottom-2 right-0 z-10 text-sm font-bold px-3 py-1 rounded-full border border-slate-100 shadow-sm ${pill}`}>
-                  {label}
-                </span>
-
-                <div className="flex items-start justify-between">
-                  <p className="text-slate-800 font-bold text-lg flex-1 min-w-0 mr-2">{inv.client}</p>
-                  <span className="text-slate-900 font-bold text-lg shrink-0">₹{Math.round(inv.amount).toLocaleString('en-IN')}</span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <p className="text-slate-500 text-base">{inv.area} · {inv.items} items</p>
-                  <div className="text-right">
-                    {inv.due > 0 ? (
-                      <div>
-                        <span className="text-red-600 font-semibold text-base">₹{Math.round(inv.due).toLocaleString('en-IN')}</span>
-                        {showLate && (
-                          <span className="text-red-500 text-sm ml-1">({inv.overdueDays}d)</span>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-emerald-600 font-semibold text-base">Cleared ✓</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 flex-wrap text-md">
-                  <span className="text-slate-500 font-mono font-bold">{inv.id}</span>
-                  <span className="text-slate-400">·</span>
-                  <span className="text-slate-500">
-                    {inv.date ? (() => { const [y, m, d] = inv.date.split('-'); return `${d}/${m}/${y}`; })() : ''}
-                  </span>
-                  {showLate && (
-                    <span className="text-red-500 font-bold bg-red-50 px-2 py-0.5 rounded-full">
-                      {inv.overdueDays}d late
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex justify-center -mt-2">
-                  <ChevronUp size={20} className="text-slate-600" />
-                </div>
-              </button>
-            );
-          })
+          pageData.map(inv => (
+            <InvoiceCard
+              key={inv._id}
+              invoice={inv}
+              onClick={() => setSelectedInv(inv)}
+            />
+          ))
         )}
       </div>
 
@@ -298,7 +246,7 @@ export const InvoicesTab = ({ onGST, onMakeInvoice }) => {
       </button>
 
       {selectedInv && <InvoiceDetailModal invoice={selectedInv} onClose={() => setSelectedInv(null)} />}
-      
+
       {showFilter && (
         <InvoiceFilterPanel
           onClose={() => setShowFilter(false)}
