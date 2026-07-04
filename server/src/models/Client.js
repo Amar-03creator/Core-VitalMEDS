@@ -16,6 +16,8 @@ const clientSchema = new mongoose.Schema({
         enum: ['Pending', 'Active', 'Static', 'Credit Alert', 'Suspended'],
         default: 'Pending'
     },
+    suspendOtp: String,
+    suspendOtpExpiry: Date,
     deliveryRoute: String,
 
     /*

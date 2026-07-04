@@ -1,26 +1,64 @@
-// src/routes/clientRoutes.js
-
+// server/src/routes/clientRoutes.js
 const express = require('express');
-const router = express.Router();
+const router  = express.Router();
+const {
+  getAllClients,
+  getClientById,
+  createClient,
+  updateClient,
+  approveClient,
+  rejectClient,
+  updateClientStatus,
+  getClientInvoices,
+  getClientPayments,
+  getClientOrders,
+  checkDuplicate,
+  requestSuspendOtp, 
+  verifySuspendOtp,
+  reactivateClient
+} = require('../controllers/clientController');
 
-// Import the controller
-const clientController = require('../controllers/clientController');
 
-/* ── Specific/static routes FIRST ───────────────────────────────────── */
-router.get('/filter-options', clientController.getClientFilterOptions);
+// TODO: add your auth middleware (e.g. requireAdmin) before each route in production
 
-/* ── Generic routes AFTER ───────────────────────────────────────────── */
-router.get('/', clientController.getAllClients);
+// ── Directory ──────────────────────────────────────────────────────────
+// GET    /api/clients?search=&status=&businessType=&tier=&riskTier=&minScore=&maxScore=
+router.get('/',    getAllClients);
+// POST   /api/clients
+router.post('/',   createClient);
 
-// ★ FIXED: Your function is named 'registerClient', not 'createClient'!
-router.post('/', clientController.registerClient);
+// ✨ ADDED: Duplicate Checker (MUST be above /:id routes so 'duplicates' isn't treated as an ID)
+// GET    /api/clients/duplicates/check?field=...&value=...
+router.get('/duplicates/check', checkDuplicate);
 
-router.get('/:id', clientController.getClientById);
+// ── Single client ──────────────────────────────────────────────────────
+// GET    /api/clients/:id
+router.get('/:id',          getClientById);
+// PUT    /api/clients/:id
+router.put('/:id',          updateClient);
 
-// ★ IMPORTANT: If you haven't written updateClient and deleteClient inside 
-// your clientController.js yet, these MUST be commented out for now, 
-// otherwise the server will crash with the exact same error!
-// router.put('/:id', clientController.updateClient);
-// router.delete('/:id', clientController.deleteClient);
+// ── Workflow actions ───────────────────────────────────────────────────
+// PUT    /api/clients/:id/approve
+router.put('/:id/approve',  approveClient);
+// PUT    /api/clients/:id/reject     body: { reason? }
+router.put('/:id/reject',   rejectClient);
+// PUT    /api/clients/:id/status     body: { status }
+router.put('/:id/status',   updateClientStatus);
+
+// ── Activity sub-resources (lazy-loaded by tabs) ───────────────────────
+// GET    /api/clients/:id/invoices
+router.get('/:id/invoices', getClientInvoices);
+// GET    /api/clients/:id/payments
+router.get('/:id/payments', getClientPayments);
+// GET    /api/clients/:id/orders
+router.get('/:id/orders',   getClientOrders);
+
+
+// ADDED: OTP Suspension Routes
+router.post('/:id/suspend/request-otp', requestSuspendOtp);
+router.post('/:id/suspend/verify-otp', verifySuspendOtp);
+// PUT    /api/clients/:id/reactivate
+router.put('/:id/reactivate', reactivateClient);
+
 
 module.exports = router;
