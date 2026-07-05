@@ -14,17 +14,18 @@ const STORAGE_KEY = 'purchaseEntryData';
 
 export const PurchaseEntryModal = ({
   onClose,
-  companies=[],
+  onSave,
+  companies = [],
   onCompanyAdded,
   onProductAdded,
   lockedSupplierId,
-  disableBackTrap=false,
+  disableBackTrap = false,
 }) => {
   useScrollLock(true);
   useModalTrap(true, { disabled: disableBackTrap, onBackClose: onClose });
 
   const loadSavedState = () => {
-    try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY)); } catch {}
+    try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY)); } catch { }
     return null;
   };
   let savedState = loadSavedState();
@@ -34,22 +35,22 @@ export const PurchaseEntryModal = ({
     savedState = null;
   }
 
-  const [step, setStep]                     = useState(savedState?.step ?? 1);
-  const [supplierId, setSupplierId]         = useState(savedState?.supplierId ?? '');
+  const [step, setStep] = useState(savedState?.step ?? 1);
+  const [supplierId, setSupplierId] = useState(savedState?.supplierId ?? '');
   const [supplierSearch, setSupplierSearch] = useState(savedState?.supplierSearch ?? '');
-  const [invoiceNo, setInvoiceNo]           = useState(savedState?.invoiceNo ?? '');
-  const [billDate, setBillDate]             = useState(savedState?.billDate ?? '');
-  const [receivedDate, setReceivedDate]     = useState(savedState?.receivedDate ?? new Date().toISOString().split('T')[0]);
-  const [address, setAddress]               = useState(savedState?.address ?? '');
-  const [billType, setBillType]             = useState(savedState?.billType ?? 'Credit');
-  const [purchaseType, setPurchaseType]     = useState(savedState?.purchaseType ?? 'intrastate');
-  const [items, setItems]                   = useState(savedState?.items ?? []);
+  const [invoiceNo, setInvoiceNo] = useState(savedState?.invoiceNo ?? '');
+  const [billDate, setBillDate] = useState(savedState?.billDate ?? '');
+  const [receivedDate, setReceivedDate] = useState(savedState?.receivedDate ?? new Date().toISOString().split('T')[0]);
+  const [address, setAddress] = useState(savedState?.address ?? '');
+  const [billType, setBillType] = useState(savedState?.billType ?? 'Credit');
+  const [purchaseType, setPurchaseType] = useState(savedState?.purchaseType ?? 'intrastate');
+  const [items, setItems] = useState(savedState?.items ?? []);
 
-  const [billDiscountType, setBillDiscountType]   = useState(savedState?.billDiscountType ?? 'percent');
+  const [billDiscountType, setBillDiscountType] = useState(savedState?.billDiscountType ?? 'percent');
   const [billDiscountValue, setBillDiscountValue] = useState(savedState?.billDiscountValue ?? '');
 
   const [supplierProducts, setSupplierProducts] = useState([]);
-  const [productsLoading, setProductsLoading]   = useState(false);
+  const [productsLoading, setProductsLoading] = useState(false);
 
   const [showAddCompany, setShowAddCompany] = useState(savedState?.showAddCompany ?? false);
   const [showAddProduct, setShowAddProduct] = useState(savedState?.showAddProduct ?? false);
@@ -73,7 +74,7 @@ export const PurchaseEntryModal = ({
       try {
         const currentSupplier = companies.find(c => (c._id || c.id) === supplierId);
         let res;
-        
+
         // ★ FIX: Use getInventory to fetch products WITH their populated batches
         if (currentSupplier?.companyName) {
           try {
@@ -84,7 +85,7 @@ export const PurchaseEntryModal = ({
         } else {
           res = await api.getProductsByCompany(supplierId);
         }
-        
+
         if (!cancelled) setSupplierProducts(res.data || []);
       } catch {
         if (!cancelled) toast.error('Failed to load products for this supplier');
@@ -103,20 +104,20 @@ export const PurchaseEntryModal = ({
     }
 
     const formattedItems = items.map(item => ({
-      productId:      item.productId,
-      productName:    item.productName,
-      batchNumber:    item.batchNumber,
-      expiryDate:     item.expiryDate,
-      billedQty:      item.chargeableQty,
-      freeQty:        item.freeQty || 0,
-      mrp:            item.mrp,
-      purchaseRate:   item.purchaseRate,
-      ptr:            item.ptr,
-      discountType:   item.discountType,
-      discountValue:  parseFloat(item.discountValue) || 0,
-      cgstRate:       parseFloat(item.cgstRate) || 0,
-      sgstRate:       parseFloat(item.sgstRate) || 0,
-      igstRate:       parseFloat(item.igstRate) || 0,
+      productId: item.productId,
+      productName: item.productName,
+      batchNumber: item.batchNumber,
+      expiryDate: item.expiryDate,
+      billedQty: item.chargeableQty,
+      freeQty: item.freeQty || 0,
+      mrp: item.mrp,
+      purchaseRate: item.purchaseRate,
+      ptr: item.ptr,
+      discountType: item.discountType,
+      discountValue: parseFloat(item.discountValue) || 0,
+      cgstRate: parseFloat(item.cgstRate) || 0,
+      sgstRate: parseFloat(item.sgstRate) || 0,
+      igstRate: parseFloat(item.igstRate) || 0,
     }));
 
     try {
@@ -135,7 +136,8 @@ export const PurchaseEntryModal = ({
       });
       toast.success('Purchase entry saved successfully!');
       sessionStorage.removeItem(STORAGE_KEY);
-      onClose();
+      if (onSave) onSave();
+      else onClose();
     } catch (error) {
       toast.error(error.message);
     }
@@ -151,7 +153,7 @@ export const PurchaseEntryModal = ({
       try {
         const res = await api.getProductsByCompany(supplierId);
         setSupplierProducts(res.data || []);
-      } catch {}
+      } catch { }
     }
     if (onProductAdded) onProductAdded();
     setShowAddProduct(false);

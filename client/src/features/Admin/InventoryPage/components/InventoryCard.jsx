@@ -10,29 +10,34 @@ export const InventoryCard = ({ product, onEditPTR }) => {
     if (!expanded) setBatchExpanded(null);
   }, [expanded]);
 
-  const getExpiryColors = (dateString) => {
+  const getExpiryColors = (dateString, threshold = 90) => {
     if (!dateString) return 'text-slate-600 bg-slate-50 border-slate-200';
     const days = (new Date(dateString) - new Date()) / (1000 * 60 * 60 * 24);
     if (days < 30) return 'text-red-700 bg-red-100 border-red-200';
     if (days < 60) return 'text-orange-700 bg-orange-100 border-orange-200';
-    if (days < 90) return 'text-amber-700 bg-amber-100 border-amber-200';
+    if (days <= threshold) return 'text-amber-700 bg-amber-100 border-amber-200';
     return 'text-emerald-700 bg-emerald-100 border-emerald-200';
   };
 
+  const isNearExpiry = (dateString, threshold = 90) => {
+    if (!dateString) return false;
+    const days = (new Date(dateString) - new Date()) / (1000 * 60 * 60 * 24);
+    return days <= threshold;
+  };
+  
   const batches = product.batches || [];
-  const hasNearExpiry = batches.some(b => b.nearExpiry);
+  const hasNearExpiry = batches.some(b => isNearExpiry(b.expiryDate, b.shortExpiryThreshold));
 
   return (
-    <BaseProductCard 
-      product={product} 
-      expanded={expanded} 
+    <BaseProductCard
+      product={product}
+      expanded={expanded}
       onToggle={() => setExpanded(!expanded)}
       hasNearExpiry={hasNearExpiry}
     >
       <div
-        className={`overflow-hidden transition-all duration-300 ease-in-out ${
-          expanded ? 'max-h-500 opacity-100' : 'max-h-0 opacity-0'
-        }`}
+        className={`overflow-hidden transition-all duration-300 ease-in-out ${expanded ? 'max-h-500 opacity-100' : 'max-h-0 opacity-0'
+          }`}
       >
         <div className="border-t border-slate-100 px-3 py-3 bg-slate-50 space-y-2">
           <p className="text-md md:text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">
@@ -45,15 +50,16 @@ export const InventoryCard = ({ product, onEditPTR }) => {
             </p>
           ) : (
             batches.map((batch, bi) => {
-              const formattedExpiry = batch.expiryDate 
-                ? new Date(batch.expiryDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) 
+              const formattedExpiry = batch.expiryDate
+                ? new Date(batch.expiryDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
                 : 'N/A';
 
+              const batchNearExp = isNearExpiry(batch.expiryDate, batch.shortExpiryThreshold);
               return (
                 <div 
                   key={batch._id || bi} 
                   className={`rounded-xl border overflow-hidden transition-all shadow-sm ${
-                    batch.nearExpiry ? 'border-orange-200 bg-orange-50/50' : 'border-slate-200 bg-white'
+                    batchNearExp ? 'border-orange-200 bg-orange-50/50' : 'border-slate-200 bg-white'
                   }`}
                 >
                   <button 
@@ -64,7 +70,7 @@ export const InventoryCard = ({ product, onEditPTR }) => {
                       <span className="text-slate-800 font-mono text-sm md:text-base font-bold bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
                         Batch: {batch.batchNumber}
                       </span>
-                      <span className={`text-sm md:text-xs font-mono px-1 py-0.5 rounded border ${getExpiryColors(batch.expiryDate)}`}>
+                      <span className={`text-sm md:text-xs font-mono px-1 py-0.5 rounded border ${getExpiryColors(batch.expiryDate, batch.shortExpiryThreshold)}`}>
                         Exp: {formattedExpiry}
                       </span>
                     </div>
@@ -79,9 +85,8 @@ export const InventoryCard = ({ product, onEditPTR }) => {
                   </button>
 
                   <div
-                    className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                      batchExpanded === bi ? 'max-h-200 opacity-100' : 'max-h-0 opacity-0'
-                    }`}
+                    className={`overflow-hidden transition-all duration-300 ease-in-out ${batchExpanded === bi ? 'max-h-200 opacity-100' : 'max-h-0 opacity-0'
+                      }`}
                   >
                     <div className="px-2 pb-2 space-y-3 border-t border-slate-100 pt-2 bg-slate-50/30">
                       <div className="grid grid-cols-3 gap-2">
@@ -114,8 +119,8 @@ export const InventoryCard = ({ product, onEditPTR }) => {
                         <div className="space-y-1.5">
                           {batch.purchaseLots?.length > 0 ? (
                             batch.purchaseLots.map((lot, li) => (
-                              <div 
-                                key={lot._id || li} 
+                              <div
+                                key={lot._id || li}
                                 className="flex items-center justify-between bg-yellow-100 rounded-lg px-3 py-2 border border-slate-200 shadow-sm transition-all duration-200 hover:shadow-md"
                               >
                                 <div>

@@ -102,6 +102,9 @@ const InventoryPage = () => {
   }, [search, filters, quickFilter]);
 
   // Load Data
+  // client/src/pages/Admin/InventoryPage.jsx
+
+  // Find your loadInventory function and update the filtering logic:
   const loadInventory = async () => {
     setLoading(true);
     try {
@@ -116,6 +119,9 @@ const InventoryPage = () => {
       const res = await api.getInventory(apiParams);
       const data = res.data || [];
 
+      // ✨ NEW: Get today's date for dynamic calculations
+      const today = new Date();
+
       // Apply quick filters client-side
       let filteredData = data;
       if (quickFilter === 'Low Stock') {
@@ -123,7 +129,12 @@ const InventoryPage = () => {
       } else if (quickFilter === 'Out of Stock') {
         filteredData = data.filter(p => p.totalStock === 0);
       } else if (quickFilter === 'Near Expiry') {
-        filteredData = data.filter(p => p.batches?.some(b => b.nearExpiry));
+        // ✨ FIX: Calculate dynamically! (Includes already expired items)
+        filteredData = data.filter(p => p.batches?.some(b => {
+          if (!b.expiryDate) return false;
+          const days = (new Date(b.expiryDate) - today) / (1000 * 60 * 60 * 24);
+          return days <= (b.shortExpiryThreshold || 90);
+        }));
       }
 
       setInventory(filteredData);
@@ -133,7 +144,12 @@ const InventoryPage = () => {
           total: data.length,
           lowStock: data.filter(p => p.totalStock > 0 && p.totalStock <= (p.lowStockThreshold || 0)).length,
           outStock: data.filter(p => p.totalStock === 0).length,
-          nearExp: data.filter(p => p.batches?.some(b => b.nearExpiry)).length,
+          // ✨ FIX: Dynamic calc for stats too!
+          nearExp: data.filter(p => p.batches?.some(b => {
+            if (!b.expiryDate) return false;
+            const days = (new Date(b.expiryDate) - today) / (1000 * 60 * 60 * 24);
+            return days <= (b.shortExpiryThreshold || 90);
+          })).length,
         });
       }
     } catch (error) {
