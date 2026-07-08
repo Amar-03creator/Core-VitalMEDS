@@ -3,11 +3,11 @@ const SalesInvoice = require('../models/SalesInvoice');
 const Product = require('../models/Product');
 const Batch = require('../models/Batch');
 const Client = require('../models/Client');
-const Counter = require('../models/Counter');
+const { getNextInvoiceNumber } = require('../helpers/SequenceHelper');
 const Company = require('../models/Company');
 const { deductFifo, adjustLotConsumption } = require('../helpers/inventoryFifo');
 
-    exports.createSalesInvoice = async (req, res) => {
+exports.createSalesInvoice = async (req, res) => {
     const session = await mongoose.startSession();
     try {
         const { clientObjectId, billType, items, globalDiscountType, globalDiscountValue } = req.body;
@@ -25,15 +25,8 @@ const { deductFifo, adjustLotConsumption } = require('../helpers/inventoryFifo')
             const shortCodeMap = {};
             companies.forEach(c => { shortCodeMap[c._id.toString()] = c.shortCode || ''; });
 
-            const counter = await Counter.findByIdAndUpdate(
-                'invoice_seq',
-                { $inc: { seq: 1 } },
-                { new: true, upsert: true, session }
-            );
-            const seqStr = String(counter.seq).padStart(3, '0');
-            const month = String(new Date().getMonth() + 1).padStart(2, '0');
-            const year = new Date().getFullYear();
-            const invoiceNumber = `MIL-${month}-${year}-${seqStr}`;
+            // ✨ NEW: Single line to get the perfectly formatted MIL-MM-YY-XXX invoice number
+            const invoiceNumber = await getNextInvoiceNumber(session);
             const invoiceDate = new Date();
 
             let totalGross = 0, totalTaxable = 0, totalCGST = 0, totalSGST = 0, totalIGST = 0;
@@ -44,10 +37,9 @@ const { deductFifo, adjustLotConsumption } = require('../helpers/inventoryFifo')
                 const product = await Product.findById(item.productId).session(session);
                 if (!batch || !product) throw new Error('Product or Batch missing');
 
-                // Look up short code
                 const companyShortCode = shortCodeMap[product.companyId?.toString()] || '';
-
                 const billedQty = item.billedQty || (item.chargeableQty + (item.freeQty || 0));
+
                 if (batch.totalStockQuantity < billedQty) {
                     throw new Error(`Insufficient stock in Batch ${batch.batchNumber}`);
                 }
@@ -77,7 +69,7 @@ const { deductFifo, adjustLotConsumption } = require('../helpers/inventoryFifo')
                     productId: item.productId,
                     batchId: batch._id,
                     productName: product.name,
-                    companyShortCode,                         // ★ added
+                    companyShortCode,
                     batchNumber: batch.batchNumber,
                     packing: product.packing,
                     hsn: product.hsnCode,
@@ -104,7 +96,6 @@ const { deductFifo, adjustLotConsumption } = require('../helpers/inventoryFifo')
             const totalGST = totalCGST + totalSGST + totalIGST;
             let netAmount = totalTaxable + totalGST;
 
-            // Apply global discount
             let globalDiscAmt = 0;
             if (globalDiscountValue && globalDiscountValue > 0) {
                 if (globalDiscountType === 'percent') {
@@ -122,6 +113,7 @@ const { deductFifo, adjustLotConsumption } = require('../helpers/inventoryFifo')
             const previousOutstandingDate = client.outstandingDate || null;
             let availableCredit = client.creditBalance || 0;
             let creditApplied = 0;
+
             if (availableCredit > 0) {
                 creditApplied = Math.min(availableCredit, netAmount);
                 client.creditBalance -= creditApplied;

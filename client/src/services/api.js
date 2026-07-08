@@ -494,4 +494,167 @@ export const api = {
     if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to export purchase orders');
     return res.blob();
   },
+
+  /* ── Stock Availability ──────────────────────────────────────────────── */
+  /**
+   * POST /api/stock/check-availability
+   * items: [{ productId, requestedQty }]
+   * Returns a tier ('ok' | 'limited' | 'critical' | 'unavailable') + message
+   * per item. Never returns a raw stock number unless tier === 'critical'.
+   */
+  async checkStockAvailability(items) {
+    const res = await fetch(`${BASE_URL}/stock/check-availability`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items }),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to check availability');
+    return res.json();
+  },
+
+  /* ── Inquiries (RFQ) ───────────────────────────────────────────────────── */
+  async createInquiry(data) {
+    const res = await fetch(`${BASE_URL}/inquiries`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to send inquiry');
+    return res.json();
+  },
+
+  async getInquiries(params = {}) {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v) qs.set(k, v); });
+    const res = await fetch(`${BASE_URL}/inquiries${qs.toString() ? `?${qs.toString()}` : ''}`);
+    if (!res.ok) throw new Error('Failed to fetch inquiries');
+    return res.json();
+  },
+
+  async getInquiryById(id) {
+    const res = await fetch(`${BASE_URL}/inquiries/${id}`);
+    if (!res.ok) throw new Error('Failed to fetch inquiry');
+    return res.json();
+  },
+
+  async updateInquiry(id, data) {
+    const res = await fetch(`${BASE_URL}/inquiries/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to update inquiry');
+    return res.json();
+  },
+
+  async cancelInquiry(id, clientRemarks) {
+    const res = await fetch(`${BASE_URL}/inquiries/${id}/cancel`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(clientRemarks ? { clientRemarks } : {}),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to cancel inquiry');
+    return res.json();
+  },
+
+  async rejectInquiryQuote(id, clientRemarks) {
+    const res = await fetch(`${BASE_URL}/inquiries/${id}/reject`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientRemarks }),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to reject quote');
+    return res.json();
+  },
+
+  async requestInquiryChanges(id, clientRemarks) {
+    const res = await fetch(`${BASE_URL}/inquiries/${id}/request-changes`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientRemarks }),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to request changes');
+    return res.json();
+  },
+
+  /* ── Orders ───────────────────────────────────────────────────────────── */
+  async createOrder(data) {
+    const res = await fetch(`${BASE_URL}/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to place order');
+    return res.json();
+  },
+
+  /** Accept a quote from the Inquiry tab and convert it into a confirmed Order. */
+  async convertInquiryToOrder(inquiryId) {
+    const res = await fetch(`${BASE_URL}/orders/convert`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ inquiryId }),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to convert inquiry to order');
+    return res.json();
+  },
+
+  async getOrders(params = {}) {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v) qs.set(k, v); });
+    const res = await fetch(`${BASE_URL}/orders${qs.toString() ? `?${qs.toString()}` : ''}`);
+    if (!res.ok) throw new Error('Failed to fetch orders');
+    return res.json();
+  },
+
+  async getOrderById(id) {
+    const res = await fetch(`${BASE_URL}/orders/${id}`);
+    if (!res.ok) throw new Error('Failed to fetch order');
+    return res.json();
+  },
+
+  async cancelOrder(id, reason, cancelledBy = 'client') {
+    const res = await fetch(`${BASE_URL}/orders/${id}/cancel`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason, cancelledBy }),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to cancel order');
+    return res.json();
+  },
+
+  async confirmOrderDelivery(id) {
+    const res = await fetch(`${BASE_URL}/orders/${id}/deliver`, { method: 'PUT' });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to confirm delivery');
+    return res.json();
+  },
+
+  /**
+   * GET /api/orders/:id/invoice/pdf — NOT YET IMPLEMENTED SERVER-SIDE.
+   * Your commit log mentions PDF generation scripts already exist for
+   * invoices/ledgers/receipts — this just needs a thin controller route
+   * that loads the order's linked SalesInvoice and reuses that generator.
+   * Wired here so the client page's "Download Invoice" button has
+   * somewhere real to point once that route exists.
+   */
+  async downloadOrderInvoice(orderId) {
+    const res = await fetch(`${BASE_URL}/orders/${orderId}/invoice/pdf`);
+    if (!res.ok) throw new Error('Failed to download invoice');
+    return res.blob();
+  },
+
+  /* ── Notifications ────────────────────────────────────────────────────── */
+  async getNotifications(recipientId, unreadOnly = false) {
+    const qs = new URLSearchParams({ recipientId });
+    if (unreadOnly) qs.set('unreadOnly', 'true');
+    const res = await fetch(`${BASE_URL}/notifications?${qs.toString()}`);
+    if (!res.ok) throw new Error('Failed to fetch notifications');
+    return res.json();
+  },
+
+  async markNotificationRead(id) {
+    const res = await fetch(`${BASE_URL}/notifications/${id}/read`, { method: 'PUT' });
+    if (!res.ok) throw new Error('Failed to mark notification read');
+    return res.json();
+  },
 };

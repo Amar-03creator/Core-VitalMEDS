@@ -2,7 +2,7 @@ const PaymentReceipt = require('../models/PaymentReceipt');
 const SalesInvoice = require('../models/SalesInvoice');
 const Client = require('../models/Client');
 const mongoose = require('mongoose');
-
+const { getNextReceiptNumber } = require('../helpers/SequenceHelper');
 const EDIT_WINDOW_DAYS = 30;
 
 /**
@@ -119,25 +119,21 @@ exports.createPaymentReceipt = async (req, res) => {
 
     await client.save();
 
-    const currentYear = new Date().getFullYear();
-    const yearStr = currentYear.toString().slice(-2);
-    const yearStart = new Date(currentYear, 0, 1);
-    const yearEnd = new Date(currentYear, 11, 31, 23, 59, 59);
-
-    const lastReceipt = await PaymentReceipt.findOne({
-      clientObjectId: client._id,
-      createdAt: { $gte: yearStart, $lte: yearEnd },
-    }).sort({ createdAt: -1 });
-
-    const nextSeq = lastReceipt ? lastReceipt.seq + 1 : 1;
-    const paddedSeq = String(nextSeq).padStart(3, '0');
-    const partyCode = client.clientId || 'UNKNOWN'; 
-    const receiptNumber = `REC-${partyCode}-${yearStr}-${paddedSeq}`;
+    // ✨ NEW: Automatically gets format REC-CUS-MM-YY-XXX
+    const partyCode = client.clientId || 'UNKNOWN';
+    const receiptNumber = await getNextReceiptNumber(partyCode);
 
     const newReceipt = new PaymentReceipt({
-      receiptNumber, seq: nextSeq, clientObjectId: client._id, paymentDate, paymentMode,
-      referenceNumber, totalAmountPaid, allocatedInvoices: allocatedInvoicesList,
-      unallocatedAmount: remainingAmount, manualAllocation: false, adminRemarks,
+      receiptNumber,
+      clientObjectId: client._id, 
+      paymentDate, 
+      paymentMode,
+      referenceNumber, 
+      totalAmountPaid, 
+      allocatedInvoices: allocatedInvoicesList,
+      unallocatedAmount: remainingAmount, 
+      manualAllocation: false, 
+      adminRemarks,
     });
 
     await newReceipt.save();

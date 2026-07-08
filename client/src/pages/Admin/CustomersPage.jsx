@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { api } from '../../services/api';
 import { useBackHandler } from '../../hooks/useBackHandler';
 import { useCustomers } from '../../features/Admin/CustomersPage/hooks/useCustomers';
@@ -70,20 +71,38 @@ export const CustomersPage = () => {
   const [cardRect, setCardRect] = useState(null);
   const [expanded, setExpanded] = useState(() => !!sessionStorage.getItem(STORAGE_DETAIL_ID));
   const cardRefMap = useRef(new Map());
+  const [approvingId, setApprovingId] = useState(null);
 
-  // useEffect(() => {
-  //   const savedId = sessionStorage.getItem(STORAGE_DETAIL_ID);
-  //   if (savedId) {
-  //     // A tiny 50ms delay ensures React Router records this as a NEW history entry
-  //     // instead of swallowing it during the initial page hydration.
-  //     const timer = setTimeout(() => {
-  //       setDetailId(savedId);
-  //       setPhase('detail');
-  //       setExpanded(true); // Ensures it opens instantly without animation bugs
-  //     }, 50);
-  //     return () => clearTimeout(timer);
-  //   }
-  // }, []);
+const handleApproveClient = async (clientId, establishmentName) => {
+  setApprovingId(clientId);
+  try {
+    // 1. Grab the secure admin token from localStorage
+    const token = localStorage.getItem('accessToken');
+    
+    // 2. Fire the PUT request to your backend admin controller
+    const response = await axios.put(
+      `http://localhost:5000/api/clients/${clientId}/approve`, 
+      {}, 
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-user-role': 'admin' // Matches our isAdmin check in authMiddleware
+        }
+      }
+    );
+
+    if (response.data.success) {
+      toast.success(`Successfully approved ${establishmentName}! Credentials have been emailed.`);
+      
+      // 3. Refresh your UI state here (e.g., fetchCustomers() or filter out the approved client)
+    }
+  } catch (error) {
+    console.error("Approval failed:", error);
+    toast.error(error.response?.data?.message || "Failed to approve customer.");
+  } finally {
+    setApprovingId(null);
+  }
+};
 
 
 
@@ -180,11 +199,30 @@ export const CustomersPage = () => {
   const showOverlay = phase !== 'list';
 
   const handleApprove = async (customer) => {
+    setApprovingId(customer._id);
     try {
-      await api.approveClient(customer._id);
-      toast.success(`${customer.establishmentName} approved`);
-      refetch();
-    } catch (err) { toast.error(err.message); }
+      const token = localStorage.getItem('accessToken');
+      const response = await axios.put(
+        `http://localhost:5000/api/clients/${customer._id}/approve`, 
+        {}, 
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'x-user-role': 'admin'
+          }
+        }
+      );
+
+      if (response.data.success) {
+        toast.success(`Successfully approved ${customer.establishmentName}! Credentials emailed.`);
+        refetch();
+      }
+    } catch (error) {
+      console.error("Approval failed:", error);
+      toast.error(error.response?.data?.message || "Failed to approve customer.");
+    } finally {
+      setApprovingId(null);
+    }
   };
 
   const handleRejectConfirm = async (customer, reason) => {
@@ -259,7 +297,7 @@ export const CustomersPage = () => {
           <CustomerDetailPage
             clientId={detailId}
             customer={detailCustomer}
-            // ✨ Pure and clean: Handles Suspend/Reactivate UI updates and animation closures
+            onApprove={handleApprove}
             onListChange={() => {
               startCollapse();
               refetch();

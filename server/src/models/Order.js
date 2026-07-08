@@ -3,6 +3,15 @@ const orderSchema = new mongoose.Schema({
     orderId: { type: String, required: true, unique: true },
     clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'Client', required: true },
     inquiryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Inquiry', default: null },
+
+    /*
+     * isCancellable — admin-only manual override, defaults true.
+     * The normal cancel rule is purely status-based (Placed/Confirmed/
+     * Invoiced = cancellable, Shipped/Delivered = not — see orderController
+     * .cancelOrder). This flag exists only so an admin can lock cancellation
+     * early (e.g. the moment picking starts) even before the order reaches
+     * Invoiced. It is never flipped false automatically.
+     */
     isCancellable: { type: Boolean, default: true },
     adminCancelReason: String, clientCancelReason: String,
     status: { type: String, enum: ['Placed', 'Confirmed', 'Invoiced', 'Shipped', 'Delivered', 'Cancelled'], default: 'Placed' },
@@ -17,6 +26,24 @@ const orderSchema = new mongoose.Schema({
     estimatedOrderTotal: Number, finalInvoiceAmount: Number,
     invoiceDocumentId: { type: mongoose.Schema.Types.ObjectId, ref: 'SalesInvoice' },
     invoiceNumber: String, expectedDelivery: Date,
+
+    /*
+     * Shipping/dispatch info lives on the Order, not on SalesInvoice.
+     * An order can have an invoice, but not every invoice has an order
+     * (admin can bill manually), so anything order-lifecycle-specific
+     * belongs here. Populated by orderController.shipOrder.
+     */
+    dispatchDetails: {
+        transportMode: String,
+        vehicleNumber: String,
+        lrNumber: String,
+        courierName: String,
+        trackingId: String,
+        trackingUrl: String,
+    },
+    shippedAt: Date,
+    deliveredAt: Date,
+
     billPreference: { type: String, enum: ['Cash', 'Credit'] },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' }

@@ -26,7 +26,8 @@ const TABS = [
 export const CustomerDetailPage = ({
   clientId,
   customer,
-  onListChange, // Callback to notify parent list of changes (e.g., suspension)
+  onListChange, 
+  onApprove,
 }) => {
   const {
     client, loading, error,
@@ -119,6 +120,7 @@ export const CustomerDetailPage = ({
             {activeTab === 'overview' && (
               <OverviewTab 
                 client={client} 
+                onApprove={client.status === 'Pending' ? () => onApprove(client) : undefined}
                 onEdit={!isSuspended ? () => setEditOpen(true) : undefined} 
                 onSuspend={!isSuspended ? () => setSuspendOpen(true) : undefined} 
                 onReactivate={isSuspended ? handleReactivate : undefined} // ✨ ADDED

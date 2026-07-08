@@ -33,7 +33,6 @@ const salesInvoiceSchema = new mongoose.Schema({
         batchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Batch', required: true },
 
         productName: { type: String, required: true },
-        companyShortCode: { type: String },
         batchNumber: { type: String, required: true },
         packing: { type: String },
         hsn: { type: String },

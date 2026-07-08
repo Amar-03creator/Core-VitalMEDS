@@ -19,7 +19,7 @@ const InfoRow = ({ label, value, mono, urgent }) => (
   </div>
 );
 
-export const OverviewTab = ({ client, onSuspend, onEdit, onReactivate }) => {
+export const OverviewTab = ({ client, onSuspend, onEdit, onReactivate, onApprove }) => {
   if (!client) return null;
 
   const primary   = client.contacts?.find(c => c.isPrimary) || client.contacts?.[0];
@@ -122,7 +122,7 @@ export const OverviewTab = ({ client, onSuspend, onEdit, onReactivate }) => {
       </InfoCard>
 
       {/* ✨ UPDATED: Suspend, Edit, & Reactivate buttons */}
-      {(onSuspend || onEdit || onReactivate) && (
+      {(onSuspend || onEdit || onReactivate || onApprove) && (
         <div className="flex gap-3 mt-4 pb-4">
           
           {/* RECTIVATE BUTTON */}
@@ -164,6 +164,20 @@ export const OverviewTab = ({ client, onSuspend, onEdit, onReactivate }) => {
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
               </svg>
               Edit Profile
+            </button>
+          )}
+
+          {/* APPROVE BUTTON */}
+          {onApprove && client.status === 'Pending' && (
+            <button
+              onClick={onApprove}
+              className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 text-white text-base font-semibold px-4 py-3 rounded-xl hover:bg-emerald-700 transition-colors"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+              Approve & Issue Credentials
             </button>
           )}
 

@@ -2,10 +2,11 @@
 const Product = require('../models/Product');
 const Batch = require('../models/Batch');
 
-/* ── 1. Original: Get Products With Batches (Used for PDF Export) ── */
+/* ── 1. Original: Get Products With Batches (Used for PDF Export & Catalog) ── */
 exports.getProductsWithBatches = async (req, res) => {
   try {
-    const products = await Product.find({}).lean();
+    // ★ FIX: Populate companyId so we can grab the shortCode
+    const products = await Product.find({}).populate('companyId', 'shortCode').lean();
 
     const enriched = await Promise.all(
       products.map(async (product) => {
@@ -30,6 +31,13 @@ exports.getProductsWithBatches = async (req, res) => {
           id: product._id,
           name: product.name,
           company: product.company,
+          // ★ FIX: Safely grab shortCode, fallback to full name if missing
+          companyShortCode: product.companyId ? product.companyId.shortCode : product.company,
+          // ★ FIX: Add all the missing fields needed for the detail drawer
+          categories: product.categories,
+          description: product.description,
+          usageTips: product.usageTips,
+          type: product.type,
           compositions: product.compositions,
           packing: product.packing,
           hsn: product.hsnCode,

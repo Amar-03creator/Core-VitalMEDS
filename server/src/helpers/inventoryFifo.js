@@ -1,3 +1,5 @@
+// server/src/helpers/inventoryFifo.js
+
 const Batch = require('../models/Batch');
 
 /**
