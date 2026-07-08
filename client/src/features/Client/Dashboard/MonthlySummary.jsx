@@ -7,7 +7,9 @@ const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep
 /**
  * Monthly summary with a calendar‑style year/month picker.
  * @param {Object} props
- * @param {Object} props.summaryData - Data keyed by "YYYY-MM", e.g. { "2025-04": { ordered, prevDue, paid, outstanding } }
+ * @param {Object} props.summaryData - Data keyed by "YYYY-MM", e.g.
+ *   { "2025-04": { ordered, billCount, prevDue, paid, outstanding } }
+ *   `billCount` = number of bills raised that month (shown next to Total Ordered).
  * @param {Object} props.startDate - First order date: { year: 2023, month: 5 } (May 2023)
  * @param {Object} props.currentDate - Today's date (defaults to new Date())
  * @param {Function} props.onMonthChange - Optional callback when month/year changes
@@ -18,12 +20,11 @@ const MonthlySummary = ({
   currentDate = new Date(),
   onMonthChange = () => {},
 }) => {
-  // Derive available year range
   const currentYear = currentDate.getFullYear();
-  const currentMonthIndex = currentDate.getMonth(); // 0‑based
+  const currentMonthIndex = currentDate.getMonth();
 
   const startYear = startDate?.year ?? currentYear;
-  const startMonthIndex = startDate?.month ?? 0; // 0‑based
+  const startMonthIndex = startDate?.month ?? 0;
 
   const availableYears = useMemo(() => {
     const years = [];
@@ -31,18 +32,15 @@ const MonthlySummary = ({
     return years;
   }, [startYear, currentYear]);
 
-  // Selected year & month state
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [selectedMonth, setSelectedMonth] = useState(currentMonthIndex);
 
-  // Helper: is a given (year, month) selectable?
   const isMonthSelectable = (year, monthIndex) => {
     if (year === startYear && monthIndex < startMonthIndex) return false;
     if (year === currentYear && monthIndex > currentMonthIndex) return false;
     return true;
   };
 
-  // Change handlers
   const goPrevMonth = () => {
     let newYear = selectedYear;
     let newMonth = selectedMonth - 1;
@@ -50,7 +48,7 @@ const MonthlySummary = ({
       newMonth = 11;
       newYear -= 1;
     }
-    if (newYear < startYear) return; // boundary
+    if (newYear < startYear) return;
     if (!isMonthSelectable(newYear, newMonth)) return;
     setSelectedYear(newYear);
     setSelectedMonth(newMonth);
@@ -74,10 +72,8 @@ const MonthlySummary = ({
   const handleYearChange = (e) => {
     const year = parseInt(e.target.value, 10);
     setSelectedYear(year);
-    // Auto‑adjust month if current selection is invalid in the new year
     let newMonth = selectedMonth;
     if (!isMonthSelectable(year, newMonth)) {
-      // Default to the first selectable month in that year
       const firstValid = monthNames.findIndex((_, m) => isMonthSelectable(year, m));
       newMonth = firstValid !== -1 ? firstValid : 0;
     }
@@ -85,11 +81,24 @@ const MonthlySummary = ({
     onMonthChange({ year, month: newMonth });
   };
 
-  // Get data for the selected YYYY-MM
   const dataKey = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
-  const data = summaryData[dataKey] || { ordered: 0, prevDue: 0, paid: 0, outstanding: 0 };
+  const data = summaryData[dataKey] || { ordered: 0, billCount: 0, prevDue: 0, paid: 0, outstanding: 0 };
 
   const isCurrent = selectedYear === currentYear && selectedMonth === currentMonthIndex;
+
+  const stats = [
+    {
+      label: 'Total Ordered',
+      value: data.ordered,
+      subValue: `${data.billCount || 0} Bill${(data.billCount || 0) === 1 ? '' : 's'}`,
+      icon: ShoppingCart,
+      color: 'text-blue-600',
+      bg: 'bg-blue-50',
+    },
+    { label: 'Amount Paid', value: data.paid, icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { label: 'Previous Due', value: data.prevDue, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
+    { label: 'Outstanding', value: data.outstanding, icon: Wallet, color: 'text-red-600', bg: 'bg-red-50' },
+  ];
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
@@ -105,7 +114,6 @@ const MonthlySummary = ({
 
         <div className="flex-1 flex flex-col items-center">
           <div className="flex items-center gap-2 mb-1">
-            {/* Year selector dropdown */}
             <select
               value={selectedYear}
               onChange={handleYearChange}
@@ -121,7 +129,7 @@ const MonthlySummary = ({
             </span>
           </div>
           {isCurrent && (
-            <p className="text-emerald-600 text-[12px] font-bold uppercase tracking-wide">
+            <p className="text-emerald-600 text-sm font-bold uppercase tracking-wide">
               Current Month
             </p>
           )}
@@ -141,7 +149,7 @@ const MonthlySummary = ({
         <div className="grid grid-cols-6 gap-1 sm:gap-2">
           {monthNames.map((name, idx) => {
             const selectable = isMonthSelectable(selectedYear, idx);
-            const isSelected = selectedYear === selectedYear && selectedMonth === idx;
+            const isSelected = selectedMonth === idx;
             return (
               <button
                 key={name}
@@ -153,7 +161,7 @@ const MonthlySummary = ({
                 }}
                 disabled={!selectable}
                 className={`
-                  text-sm sm:text-sm font-medium py-1.5 rounded-lg transition-colors
+                  text-sm font-medium py-1.5 rounded-lg transition-colors
                   ${selectable
                     ? isSelected
                       ? 'bg-emerald-600 text-white shadow-sm'
@@ -171,19 +179,19 @@ const MonthlySummary = ({
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 gap-px bg-slate-100">
-        {[
-          { label: 'Total Ordered', value: data.ordered, icon: ShoppingCart, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: 'Amount Paid', value: data.paid, icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-          { label: 'Previous Due', value: data.prevDue, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
-          { label: 'Outstanding', value: data.outstanding, icon: Wallet, color: 'text-red-600', bg: 'bg-red-50' },
-        ].map(({ label, value, icon: Icon, color, bg }) => (
+        {stats.map(({ label, value, subValue, icon: Icon, color, bg }) => (
           <div key={label} className="bg-white px-4 py-5 justify-center items-center flex flex-col">
             <div className={`w-9 h-9 ${bg} rounded-xl flex items-center justify-center mb-2.5`}>
               <Icon size={17} className={color} />
             </div>
-            <p className={`text-2xl font-bold ${color}`}>
-              ₹{value >= 1000 ? `${(value / 1000).toFixed(1)}K` : value}
-            </p>
+            <div className="flex items-baseline gap-1.5">
+              <p className={`text-2xl font-bold ${color}`}>
+                ₹{value >= 1000 ? `${(value / 1000).toFixed(1)}K` : value}
+              </p>
+              {subValue && (
+                <span className="text-sm font-semibold text-slate-400 whitespace-nowrap">{subValue}</span>
+              )}
+            </div>
             <p className="text-slate-400 text-sm mt-0.5">{label}</p>
           </div>
         ))}

@@ -1,3 +1,4 @@
+// features/Client/Dashboard/PromoGrid.jsx
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -184,11 +185,11 @@ const PromoGrid = () => {
                 <Icon size={18} className={`h-5 w-5 ${tile.iconText} sm:h-6 sm:w-6`} />
               </div>
 
-              <p className="relative whitespace-pre-line text-center text-[13px] font-semibold leading-tight text-slate-800 sm:text-[14px] md:text-[15px]">
+              <p className="relative whitespace-pre-line text-center text-sm font-semibold leading-tight text-slate-800 sm:text-base">
                 {tile.shortLabel}
               </p>
 
-              <span className="relative rounded-full bg-white px-2 py-0.5 text-[10px] font-bold tracking-wider text-slate-600 shadow-sm sm:px-3">
+              <span className="relative rounded-full bg-white px-2 py-0.5 text-sm font-bold tracking-wider text-slate-600 shadow-sm sm:px-3">
                 {tile.badge}
               </span>
             </button>

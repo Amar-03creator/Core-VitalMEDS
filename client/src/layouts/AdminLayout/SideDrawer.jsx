@@ -1,6 +1,7 @@
 // components/Admin/Layout/SideDrawer.jsx
 import { Link } from 'react-router-dom';
 import { Settings, LogOut, ChevronRight, TrendingUp, LayoutDashboard, Users, ShoppingCart, Package, Layers, FileText, Building2, BarChart2, MessageSquare, Bell, ClipboardList } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import { useBackHandler } from '../../hooks/useBackHandler';
 import { useEffect } from 'react';
 
@@ -34,6 +35,7 @@ const allNavItems = [
 
 export const SideDrawer = ({ open, onClose, currentPath }) => {
   useBackHandler(open, onClose);
+  const { logout } = useAuth();
   const isActive = (path, exact) => exact ? currentPath === path : currentPath.startsWith(path);
 
   useEffect(() => {
@@ -113,7 +115,7 @@ export const SideDrawer = ({ open, onClose, currentPath }) => {
               <Settings size={16} />
               <span className="text-sm font-medium">Settings</span>
             </Link>
-            <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-400/80 hover:text-red-400 hover:bg-red-500/10 transition-all">
+            <button onClick={logout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-400/80 hover:text-red-400 hover:bg-red-500/10 transition-all">
               <LogOut size={16} />
               <span className="text-sm font-medium">Sign Out</span>
             </button>
