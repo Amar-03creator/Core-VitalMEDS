@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import {
   Pill, ChevronLeft, ChevronRight, Building2, User, FileText,
   MapPin, Mail, Phone, Lock, Eye, EyeOff, Upload, CheckCircle2,
@@ -163,13 +164,43 @@ const RegisterPage = () => {
     setCurrentStep(s => s - 1);
   };
 
-  const handleSubmit = () => {
-    // Prepare data to send to backend (including shippingAddress)
-    console.log('Form submitted:', {
-      ...form,
-      // If sameAsBilling, shippingAddress should be set to billingAddress (or left as is, but backend can use billing address)
-    });
-    setTimeout(() => setSubmitted(true), 800);
+  const handleSubmit = async () => {
+    try {
+      // 1. Package the form state into the payload our backend expects
+      const payload = {
+        establishmentName: form.establishmentName,
+        ownerName: form.ownerName,
+        designation: form.designation,
+        businessType: form.businessType,
+        email: form.email,
+        phone: form.phone,
+        password: form.password,
+        billingAddress: form.billingAddress,
+        shippingAddress: form.sameAsBilling ? form.billingAddress : form.shippingAddress,
+        city: form.city,
+        district: form.district,
+        pincode: form.pincode,
+        gstin: form.docType === 'gstin' ? form.gstin : null,
+        drugLicense20B: form.docType === 'gstin' ? form.drugLicense20B : null,
+        drugLicense21B: form.docType === 'gstin' ? form.drugLicense21B : null,
+        aadhaar: form.docType === 'aadhaar' ? form.aadhaar : null,
+        pan: form.docType === 'aadhaar' ? form.pan : null,
+      };
+
+      // 2. Send it to your Node.js backend
+      // (Change 5000 to whatever port your backend is running on)
+      const response = await axios.post('http://localhost:5000/api/auth/register', payload);
+
+      // 3. Show the success screen!
+      if (response.data.success) {
+        setSubmitted(true);
+      }
+    } catch (error) {
+      console.error('Submission failed:', error);
+      // Grab the error message from our backend (e.g., "Email already exists")
+      const errorMessage = error.response?.data?.message || 'Something went wrong. Please try again.';
+      alert(errorMessage); 
+    }
   };
 
   /* ── SUCCESS STATE ── */

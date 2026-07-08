@@ -10,7 +10,7 @@ const clientSchema = new mongoose.Schema({
         uppercase: true,
         match: /^[0-9A-Z]{3}$/,
     },
-    businessType: { type: String, enum: ['Retail', 'Hospital', 'Clinic'], required: true },
+    businessType: { type: String, enum: ['Retail', 'Wholesale' , 'Hospital', 'Clinic'], required: true },
     status: {
         type: String,
         enum: ['Pending', 'Active', 'Static', 'Credit Alert', 'Suspended'],
@@ -51,7 +51,9 @@ const clientSchema = new mongoose.Schema({
 
     gstin: {
         type: String,
-        required: true,
+        required: function() { 
+            return !this.aadhaarNumber; 
+        },
         unique: true,
         uppercase: true,
         minlength: 15,
@@ -91,9 +93,40 @@ const clientSchema = new mongoose.Schema({
 
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' }
-}, { timestamps: true });
+}, {
+    timestamps: true,
+    // Needed so the two virtuals below actually appear in API responses
+    // (res.json(client) / JSON.stringify(client) call toJSON() under the hood).
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+});
 
 // Index for fast line/city filtering on the Payments tab
 clientSchema.index({ line: 1, city: 1 });
+
+/*
+ * isApproved / isSuspended — computed, never stored.
+ *
+ * These exist so the customer-facing frontend (Products page gating,
+ * Cart "Order Now" tab access) can read a plain boolean exactly as the
+ * UI spec expects, instead of re-deriving it from the status string in
+ * five different components. They're virtuals, not persisted fields, so
+ * there's no migration and no risk of drifting out of sync with `status`
+ * — approveClient / rejectClient / requestSuspendOtp / verifySuspendOtp /
+ * reactivateClient in clientController.js don't need to change at all.
+ *
+ * 'Static' and 'Credit Alert' are deliberately NOT folded in here — they
+ * don't gate anything in the customer-facing flow (the credit-limit check
+ * there compares totalOutstanding vs creditLimit directly). If you want
+ * them as their own derived flags later, add separate virtuals for them
+ * rather than overloading these two.
+ */
+clientSchema.virtual('isApproved').get(function () {
+    return this.status === 'Active';
+});
+
+clientSchema.virtual('isSuspended').get(function () {
+    return this.status === 'Suspended';
+});
 
 module.exports = mongoose.model('Client', clientSchema);

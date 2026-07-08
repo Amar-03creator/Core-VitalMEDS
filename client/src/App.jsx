@@ -1,12 +1,13 @@
 // src/App.jsx
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import ProtectedRoute from './components/ProtectedRoute';
+import PublicRoute from './components/PublicRoute'; // ✨ IMPORTED
 import { Toaster } from 'sonner';
 
-// 1. IMPORT THE NEW DATA PROVIDER
-import { ReferenceDataProvider } from './context/ReferenceDataContext'; 
-
-// (Delete the old NavStackProvider import)
-// import { NavStackProvider } from './context/NavStackContext'; 
+// 1. IMPORT THE DATA PROVIDERS
+import { ReferenceDataProvider } from './context/ReferenceDataContext';
+import { CartProvider } from './context/CartContext'; 
+import { AuthProvider } from './context/AuthContext';
 
 import LandingPage from './pages/Public/landingPage';
 import LoginPage from './pages/Public/LoginPage';
@@ -41,45 +42,59 @@ import ExpiryOffersPage from './pages/Admin/ExpiryOffersPage';
 
 function App() {
   return (
-    <Router>
-      {/* 2. WRAP YOUR ROUTES IN THE REFERENCE DATA PROVIDER */}
-      <ReferenceDataProvider>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+    <AuthProvider>
+      <Router>
+        <ReferenceDataProvider>
+          <CartProvider>
+            <Routes>
+              
+              {/* ✨ PUBLIC ROUTES (Only accessible if NOT logged in) */}
+              <Route element={<PublicRoute />}>
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+              </Route>
 
-          <Route path="/client-dashboard" element={<ClientLayout />}>
-            <Route index element={<ClientDashboard />} />
-            <Route path="products" element={<ClientProductsPage />} />
-            <Route path="inquiry" element={<ClientInquiryPage />} />
-            <Route path="orders" element={<ClientOrdersPage />} />
-            <Route path="billing" element={<ClientBillingPage />} />
-            <Route path="support" element={<ClientSupportPage />} />
-            <Route path="notifications" element={<ClientNotificationsPage />} />
-            <Route path="quick-reorder" element={<ClientQuickReorderPage />} />
-            <Route path="cart" element={<ClientCart />} />
-          </Route>
+              {/* ✨ CLIENT PROTECTED ROUTES (Only accessible to Clients) */}
+              <Route element={<ProtectedRoute allowedRoles={['client']} />}>
+                <Route path="/client-dashboard" element={<ClientLayout />}>
+                  <Route index element={<ClientDashboard />} />
+                  <Route path="products" element={<ClientProductsPage />} />
+                  <Route path="inquiry" element={<ClientInquiryPage />} />
+                  <Route path="orders" element={<ClientOrdersPage />} />
+                  <Route path="billing" element={<ClientBillingPage />} />
+                  <Route path="support" element={<ClientSupportPage />} />
+                  <Route path="notifications" element={<ClientNotificationsPage />} />
+                  <Route path="quick-reorder" element={<ClientQuickReorderPage />} />
+                  <Route path="cart" element={<ClientCart />} />
+                </Route>
+              </Route>
 
-          <Route path="/admin-dashboard" element={<AdminLayout />}>
-            <Route index element={<AdminDashboard />} />
-            <Route path="customers" element={<CustomersPage />} />
-            <Route path="customers/:id" element={<CustomersPage />} />
-            <Route path="inquiries" element={<InquiriesPage />} />
-            <Route path="orders" element={<OrdersPage />} />
-            <Route path="inventory" element={<InventoryPage />} />
-            <Route path="products" element={<ProductsPage />} />
-            <Route path="companies" element={<CompaniesPage />} />
-            <Route path="billing" element={<BillingPage />} />
-            <Route path="analytics" element={<AnalyticsPage />} />
-            <Route path="support" element={<SupportPage />} />
-            <Route path="notifications" element={<NotificationsPage />} />
-            <Route path="expiry-offers" element={<ExpiryOffersPage />} />
-          </Route>
-        </Routes>
-        <Toaster position="top-right" richColors closeButton toastOptions={{ duration: 3000, style: { fontSize: '18px' } }} />
-      </ReferenceDataProvider>
-    </Router>
+              {/* ✨ ADMIN PROTECTED ROUTES (Only accessible to Admins) */}
+              <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+                <Route path="/admin-dashboard" element={<AdminLayout />}>
+                  <Route index element={<AdminDashboard />} />
+                  <Route path="customers" element={<CustomersPage />} />
+                  <Route path="customers/:id" element={<CustomersPage />} />
+                  <Route path="inquiries" element={<InquiriesPage />} />
+                  <Route path="orders" element={<OrdersPage />} />
+                  <Route path="inventory" element={<InventoryPage />} />
+                  <Route path="products" element={<ProductsPage />} />
+                  <Route path="companies" element={<CompaniesPage />} />
+                  <Route path="billing" element={<BillingPage />} />
+                  <Route path="analytics" element={<AnalyticsPage />} />
+                  <Route path="support" element={<SupportPage />} />
+                  <Route path="notifications" element={<NotificationsPage />} />
+                  <Route path="expiry-offers" element={<ExpiryOffersPage />} />
+                </Route>
+              </Route>
+
+            </Routes>
+            <Toaster position="top-right" richColors closeButton toastOptions={{ duration: 3000, style: { fontSize: '18px' } }} />
+          </CartProvider>
+        </ReferenceDataProvider>
+      </Router>
+    </AuthProvider>
   );
 }
 

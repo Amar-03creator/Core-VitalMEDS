@@ -36,6 +36,7 @@ const dashboardRoutes = require('./src/routes/dashboardRoutes');
 const auditRoutes = require('./src/routes/auditRoutes');
 const replenishmentRoutes = require('./src/routes/replenishmentRoutes');
 const debitNoteRoutes = require('./src/routes/debitNoteRoutes');
+const authRoutes = require('./src/routes/authRoutes');
 
 
 
@@ -56,7 +57,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/audit', require('./src/routes/auditRoutes'));
 app.use('/api/replenishment', replenishmentRoutes);
 app.use('/api/debit-notes', debitNoteRoutes);
-
+app.use('/api/auth', require('./src/routes/authRoutes'));
 
 
 
