@@ -1,42 +1,49 @@
-// src/features/Client/Cart/hooks/useStockAvailability.js
 import { useState, useEffect, useRef } from 'react';
 import { api } from '../../../../services/api';
 import { computeStockTier } from '../../../../utils/stockTier';
 
 const DEBOUNCE_MS = 400;
 
-// getProductsWithBatches doesn't return lowStockThreshold or
-// criticalStockThresholdPercent per product, so this fallback uses the
-// Product schema's own defaults (50 units / 50%) rather than a per-item
-// value it doesn't have. It's only ever hit if the live call below fails
-// (network issue, product deleted mid-session) — the real
-// /api/stock/check-availability call is the source of truth and now runs
-// against real Mongo ids, so it should succeed the vast majority of the time.
-const localTierFor = (item) =>
-  computeStockTier({
+const localTierFor = (item) => {
+  let stockToCheck = item.totalStock || 0;
+  
+  if (item.batchId && item.batches) {
+    // 1. OFFER ROW: Checks only its specific batch stock
+    const batch = item.batches.find(b => String(b._id) === String(item.batchId) || String(b.id) === String(item.batchId) || String(b.no) === String(item.batchId));
+    if (batch) {
+      stockToCheck = batch.stock ?? batch.remainingUnits ?? batch.totalStockQuantity ?? item.totalStock;
+    }
+  } else if (!item.batchId && item.batches) {
+    // 2. NORMAL ROW: Checks Global Stock MINUS Fenced Offer Batches
+    let offerStockToExclude = 0;
+    item.batches.forEach(b => {
+      // Find batches that have an active offer
+      if (b.offer && (b.offer.isActive || b.offer.description)) {
+        offerStockToExclude += (b.stock ?? b.remainingUnits ?? b.totalStockQuantity ?? 0);
+      }
+    });
+    stockToCheck = Math.max(0, stockToCheck - offerStockToExclude);
+  }
+
+  return computeStockTier({
     requestedQty: item.requestedQty,
-    currentStock: item.totalStock,
+    currentStock: stockToCheck,
     lowStockThreshold: 50,
     criticalThresholdPercent: 50,
   });
+};
 
-/**
- * Re-checks stock for every item in the active tab whenever quantities
- * change, debounced so typing a quantity doesn't fire a request per
- * keystroke. Prefers the real POST /api/stock/check-availability call;
- * falls back to computing the tier locally (see localTierFor above) for
- * any single item the backend can't resolve.
- */
 export function useStockAvailability(items) {
-  const [tierByProductId, setTierByProductId] = useState({});
+  // ✨ UPGRADE: Switched to Key map instead of purely ProductID
+  const [tierByKey, setTierByKey] = useState({});
   const [checking, setChecking] = useState(false);
   const latestRequestId = useRef(0);
 
-  const depKey = JSON.stringify(items.map((i) => [i.productId, i.requestedQty]));
+  const depKey = JSON.stringify(items.map((i) => [i.productId, i.batchId, i.requestedQty]));
 
   useEffect(() => {
     if (items.length === 0) {
-      setTierByProductId({});
+      setTierByKey({});
       return;
     }
 
@@ -45,31 +52,39 @@ export function useStockAvailability(items) {
 
     const timer = setTimeout(async () => {
       try {
-        const payload = items.map((i) => ({ productId: i.productId, requestedQty: i.requestedQty }));
+        const payload = items.map((i) => ({ 
+            productId: i.productId, 
+            batchId: i.batchId, 
+            requestedQty: i.requestedQty 
+        }));
+        
         const res = await api.checkStockAvailability(payload);
-        if (requestId !== latestRequestId.current) return; // superseded by a newer check
+        if (requestId !== latestRequestId.current) return;
 
-        const byId = {};
+        const byKey = {};
         (res.data || []).forEach((r, idx) => {
-          byId[r.productId] =
-            r.message === 'Product not found.'
-              ? localTierFor(items[idx])
+          const item = items[idx];
+          const cartKey = `${item.productId}_${item.batchId || 'standard'}`;
+          byKey[cartKey] = r.message === 'Product not found.'
+              ? localTierFor(item)
               : { tier: r.tier, availableQty: r.availableQty, message: r.message };
         });
-        setTierByProductId(byId);
+        setTierByKey(byKey);
       } catch {
         if (requestId !== latestRequestId.current) return;
-        const byId = {};
-        items.forEach((item) => { byId[item.productId] = localTierFor(item); });
-        setTierByProductId(byId);
+        const byKey = {};
+        items.forEach((item) => { 
+            const cartKey = `${item.productId}_${item.batchId || 'standard'}`;
+            byKey[cartKey] = localTierFor(item); 
+        });
+        setTierByKey(byKey);
       } finally {
         if (requestId === latestRequestId.current) setChecking(false);
       }
     }, DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- depKey is items' value-comparison key
   }, [depKey]);
 
-  return { tierByProductId, checking };
+  return { tierByKey, checking };
 }

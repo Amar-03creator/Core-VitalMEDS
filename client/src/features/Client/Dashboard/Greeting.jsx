@@ -10,7 +10,7 @@ const getTierSubtext = (tier) => {
 };
 
 const Greeting = ({ owner, tier, isApproved }) => {
-  const firstName = owner.slice(0, owner.indexOf(' ')) || owner;
+  const firstName = owner.includes(' ') ? owner.slice(0, owner.indexOf(' ')) : owner;
 
   return (
     <div className="flex items-start justify-between">

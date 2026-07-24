@@ -2,8 +2,11 @@
 import { AlertTriangle, Info } from 'lucide-react';
 import { buildAlerts } from '../utils/alertsBuilder';
 
-const AlertsPanel = ({ items, tierByProductId }) => {
-  const alerts = buildAlerts(items, tierByProductId);
+// ✨ FIX: Destructure tierByKey instead of the old tierByProductId
+const AlertsPanel = ({ items, tierByKey }) => {
+  // ✨ FIX: Pass tierByKey into the builder
+  const alerts = buildAlerts(items, tierByKey || {});
+  
   if (alerts.length === 0) return null;
 
   return (
@@ -20,7 +23,7 @@ const AlertsPanel = ({ items, tierByProductId }) => {
           ) : (
             <Info size={14} className="text-blue-500 shrink-0 mt-0.5" />
           )}
-          <p className={`text-xs sm:text-sm ${alert.type === 'warning' ? 'text-amber-700' : 'text-blue-700'}`}>
+          <p className={`text-sm sm:text-base ${alert.type === 'warning' ? 'text-amber-700' : 'text-blue-700'}`}>
             <span className="font-semibold">{alert.type === 'warning' ? 'Warning: ' : 'Note: '}</span>
             {alert.text}
           </p>

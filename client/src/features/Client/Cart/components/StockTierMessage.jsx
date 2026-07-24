@@ -12,7 +12,7 @@ const StockTierMessage = ({ tier, name }) => {
   return (
     <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
       <AlertTriangle size={13} className="text-amber-600 shrink-0" />
-      <p className="text-amber-700 text-xs sm:text-sm">{text}</p>
+      <p className="text-amber-700 text-sm sm:text-base">{text}</p>
     </div>
   );
 };

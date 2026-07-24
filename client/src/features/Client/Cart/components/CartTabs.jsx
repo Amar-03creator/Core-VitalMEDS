@@ -1,3 +1,4 @@
+// client/src/features/Client/Cart/components/CartTabs.jsx
 import { Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -17,7 +18,7 @@ const CartTabs = ({ activeTab, onChange, canOrder, inquiryCount, orderCount }) =
       {/* Inquiry Tab - Always active and clickable */}
       <button
         onClick={() => onChange('inquiry')}
-        className={`flex-1 py-3 sm:py-4 text-sm sm:text-base font-semibold border-b-2 transition-colors ${
+        className={`flex-1 py-3 sm:py-4 text-base sm:text-lg font-semibold border-b-2 transition-colors ${
           activeTab === 'inquiry'
             ? 'text-emerald-600 border-emerald-500'
             : 'text-slate-400 border-transparent hover:text-slate-600'
@@ -30,7 +31,7 @@ const CartTabs = ({ activeTab, onChange, canOrder, inquiryCount, orderCount }) =
       {/* Order Tab - Faded & shows toast if not approved */}
       <button
         onClick={handleOrderClick}
-        className={`flex-1 py-3 sm:py-4 text-sm sm:text-base font-semibold border-b-2 transition-colors flex items-center justify-center gap-1.5 ${
+        className={`flex-1 py-3 sm:py-4 text-base sm:text-lg font-semibold border-b-2 transition-colors flex items-center justify-center gap-1.5 ${
           !canOrder
             ? 'text-slate-400 border-transparent opacity-60' // ✨ Lightened style for unapproved
             : activeTab === 'order'

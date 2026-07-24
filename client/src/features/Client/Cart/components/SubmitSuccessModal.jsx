@@ -1,14 +1,24 @@
 // src/features/Client/Cart/components/SubmitSuccessModal.jsx
+
 import { CheckCircle2, ArrowRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const SubmitSuccessModal = ({ type, onClose }) => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleGoToOrders = () => {
     onClose();
-    // Redirects exactly to the route defined in your App.jsx
-    navigate('/client-dashboard/orders');
+    
+    // ✨ FIX: Force the sub-tabs back to 'pending' so the app forgets your previous history!
+    sessionStorage.setItem('ordersSubTab', 'pending');
+    sessionStorage.setItem('inquiriesSubTab', 'pending');
+
+    // Redirects to orders page and opens the correct tab based on what was submitted
+    if (!location.pathname.includes('/orders')) {
+      const targetTab = type === 'order' ? 'orders' : 'inquiries';
+      navigate('/client-dashboard/orders', { state: { initialTab: targetTab } });
+    }
   };
 
   return (
@@ -33,14 +43,14 @@ const SubmitSuccessModal = ({ type, onClose }) => {
             onClick={handleGoToOrders} 
             className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 sm:py-4 rounded-xl text-base sm:text-lg transition-colors shadow-md shadow-emerald-200"
           >
-            Go to My Orders <ArrowRight size={20} />
+            {type === 'inquiry' ? 'Go to Inquiries Page' : 'Go to Orders Page'} <ArrowRight size={20} />
           </button>
           
           <button 
             onClick={onClose} 
             className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3.5 sm:py-4 rounded-xl text-base sm:text-lg transition-colors"
           >
-            Close
+            Stay on this page
           </button>
         </div>
       </div>

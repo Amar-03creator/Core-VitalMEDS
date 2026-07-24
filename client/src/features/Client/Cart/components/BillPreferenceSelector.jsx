@@ -2,7 +2,7 @@
 
 const BillPreferenceSelector = ({ value, onChange, creditDisabled }) => (
   <div>
-    <p className="text-slate-600 text-sm sm:text-base font-semibold mb-2">Bill Preference</p>
+    <p className="text-slate-600 text-base sm:text-lg font-semibold mb-2">Bill Preference</p>
     <div className="flex w-full rounded-full border-2 border-slate-200 p-1 bg-white">
       {['Cash', 'Credit'].map((type) => {
         const disabled = type === 'Credit' && creditDisabled;
@@ -29,9 +29,11 @@ const BillPreferenceSelector = ({ value, onChange, creditDisabled }) => (
         );
       })}
     </div>
+
+    {/* Credit Disabled Message - Not implemented for now*/}
     {creditDisabled && (
       <p className="text-red-500 text-xs sm:text-sm mt-1.5">Credit Bill is disabled — your credit limit has been exceeded.</p>
-    )}
+    )} 
   </div>
 );
 
