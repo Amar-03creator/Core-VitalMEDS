@@ -8,12 +8,21 @@ export const CardContent = ({ customer }) => {
 
   return (
     <div className="relative p-4 pb-7">
+      {/* ✨ From Other Chat: The floating visual badge */}
+      {customer.status === 'Pending' && (
+        <span className="absolute top-3 right-3 flex items-center gap-1.5 text-sm font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">
+          <span className="w-2 h-2 rounded-full bg-amber-400" />
+          Needs Approval
+        </span>
+      )}
+      
       <div className="flex items-start gap-3">
         <div className="w-14 h-14 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700 font-bold text-2xl shrink-0">
           {customer.establishmentName?.[0] || '?'}
         </div>
 
-        <div className="flex-1 min-w-0">
+        {/* ✨ From Other Chat: Padding right to avoid text overlapping the absolute badge */}
+        <div className="flex-1 min-w-0" style={customer.status === 'Pending' ? { paddingRight: '7.5rem' } : undefined}>
           <h3 className="text-slate-900 font-bold text-2xl leading-tight truncate">
             {customer.establishmentName}
           </h3>
@@ -69,21 +78,22 @@ export const CustomerCard = ({
     ref={cardRefCallback}
     onClick={() => onViewDetail(customer)}
     style={{ visibility: invisible ? 'hidden' : 'visible' }}
-    className="bg-white rounded-2xl border border-slate-200 overflow-hidden active:bg-slate-50 transition-colors cursor-pointer select-none"
+    className="bg-white rounded-2xl border border-slate-200 overflow-hidden active:bg-slate-50 transition-colors cursor-pointer select-none relative"
   >
     <CardContent customer={customer} />
 
+    {/* ✨ From Present File: Preserving the critical fast-action buttons */}
     {customer.status === 'Pending' && (
       <div className="flex gap-2 px-4 pb-4">
         <button
           onClick={(e) => { e.stopPropagation(); onApprove(customer); }}
-          className="flex-1 bg-emerald-500 text-white text-base font-semibold py-2.5 rounded-xl"
+          className="flex-1 bg-emerald-500 text-white text-base font-semibold py-2.5 rounded-xl transition-colors active:bg-emerald-600 hover:bg-emerald-400"
         >
           Approve
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); onReject(customer); }}
-          className="flex-1 bg-red-100 text-red-600 text-base font-semibold py-2.5 rounded-xl"
+          className="flex-1 bg-red-100 text-red-600 text-base font-semibold py-2.5 rounded-xl transition-colors active:bg-red-200 hover:bg-red-50"
         >
           Reject
         </button>

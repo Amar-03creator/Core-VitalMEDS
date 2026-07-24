@@ -2,8 +2,9 @@
 import { useState } from 'react';
 import { Edit, UserX, ShieldCheck } from 'lucide-react';   // keep imports for modals
 import { useCustomerDetail } from '../hooks/useCustomerDetail';
-import { SuspendOtpModal }   from '../modals/SuspendOtpModal'; // ✨ NEW: Using the secure OTP modal
+import { SuspendOtpModal }   from '../modals/SuspendOtpModal'; 
 import { EditCustomerModal } from '../modals/EditCustomerModal';
+import { TakeActionModal }   from '../modals/TakeActionModal'; // ✨ RESTORED: The Document Request / Approval Modal
 import { CardContent }       from '../components/CustomerCard';
 import { STATUS_CFG }        from '../utils/constants';
 import { OverviewTab }  from './tabs/OverviewTab';
@@ -28,6 +29,7 @@ export const CustomerDetailPage = ({
   customer,
   onListChange, 
   onApprove,
+  onReject, // ✨ RESTORED: Needed for the TakeActionModal
 }) => {
   const {
     client, loading, error,
@@ -38,6 +40,7 @@ export const CustomerDetailPage = ({
 
   const [suspendOpen, setSuspendOpen] = useState(false);
   const [editOpen,    setEditOpen]    = useState(false);
+  const [takeActionOpen, setTakeActionOpen] = useState(false); // ✨ RESTORED
 
   useBackHandler(
     activeTab !== 'overview', 
@@ -47,7 +50,7 @@ export const CustomerDetailPage = ({
 
   const displayClient = client || customer;
 
-  // ✨ NEW: Check if the account is currently suspended
+  // Check if the account is currently suspended
   const isSuspended = displayClient?.status === 'Suspended';
   const [reactivating, setReactivating] = useState(false);
 
@@ -120,10 +123,11 @@ export const CustomerDetailPage = ({
             {activeTab === 'overview' && (
               <OverviewTab 
                 client={client} 
+                onTakeAction={client.status === 'Pending' ? () => setTakeActionOpen(true) : undefined}
                 onApprove={client.status === 'Pending' ? () => onApprove(client) : undefined}
                 onEdit={!isSuspended ? () => setEditOpen(true) : undefined} 
                 onSuspend={!isSuspended ? () => setSuspendOpen(true) : undefined} 
-                onReactivate={isSuspended ? handleReactivate : undefined} // ✨ ADDED
+                onReactivate={isSuspended ? handleReactivate : undefined}
               />
             )}
             {activeTab === 'orders' && <OrdersTab orders={orders} />}
@@ -157,14 +161,29 @@ export const CustomerDetailPage = ({
         />
       )}
 
-      {/* ✨ REPLACED standard SuspendModal with SuspendOtpModal */}
       {suspendOpen && !isSuspended && (
         <SuspendOtpModal
           customer={displayClient}
           onClose={() => setSuspendOpen(false)}
           onConfirmSuccess={() => { 
             setSuspendOpen(false); 
-            if (onListChange) onListChange(); // ✨ FIX: Gracefully close and reload
+            if (onListChange) onListChange(); // Gracefully close and reload
+          }}
+        />
+      )}
+
+      {/* ✨ RESTORED: The Take Action Modal for pending accounts */}
+      {takeActionOpen && displayClient && (
+        <TakeActionModal
+          client={displayClient}
+          onClose={() => setTakeActionOpen(false)}
+          onApprove={() => {
+             setTakeActionOpen(false);
+             onApprove(displayClient);
+          }}
+          onReject={() => {
+             setTakeActionOpen(false);
+             onReject(displayClient);
           }}
         />
       )}
