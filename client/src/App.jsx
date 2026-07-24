@@ -6,7 +6,7 @@ import { Toaster } from 'sonner';
 
 // 1. IMPORT THE DATA PROVIDERS
 import { ReferenceDataProvider } from './context/ReferenceDataContext';
-import { CartProvider } from './context/CartContext'; 
+import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
 
 import LandingPage from './pages/Public/landingPage';
@@ -24,12 +24,13 @@ import ClientSupportPage from './pages/Client/ClientSupportPage';
 import ClientNotificationsPage from './pages/Client/ClientNotificationsPage';
 import ClientQuickReorderPage from './pages/Client/ClientQuickReorderPage';
 import ClientCart from './pages/Client/ClientCart';
+import ClientProfilePage from './pages/Client/ClientProfilePage';
+import ClientOffersPage from './pages/Client/ClientOffersPage'; // ✨ ADDED
 
 // Admin
 import AdminLayout from './layouts/AdminLayout/AdminLayout';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import CustomersPage from './pages/Admin/CustomersPage';
-import InquiriesPage from './pages/Admin/InquiriesPage';
 import OrdersPage from './pages/Admin/OrdersPage';
 import InventoryPage from './pages/Admin/InventoryPage';
 import ProductsPage from './pages/Admin/ProductsPage';
@@ -38,7 +39,9 @@ import BillingPage from './pages/Admin/BillingPage';
 import AnalyticsPage from './pages/Admin/AnalyticsPage';
 import SupportPage from './pages/Admin/SupportPage';
 import NotificationsPage from './pages/Admin/NotificationsPage';
-import ExpiryOffersPage from './pages/Admin/ExpiryOffersPage';
+import ExpiryOffersPage from './pages/Admin/OffersPage';
+import AdminSettingsPage from './pages/Admin/AdminSettingsPage';
+import ClaimAccount from './pages/Public/ClaimAccount';
 
 function App() {
   return (
@@ -47,12 +50,13 @@ function App() {
         <ReferenceDataProvider>
           <CartProvider>
             <Routes>
-              
+
               {/* ✨ PUBLIC ROUTES (Only accessible if NOT logged in) */}
               <Route element={<PublicRoute />}>
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
+                <Route path="/claim-account" element={<ClaimAccount />} />
               </Route>
 
               {/* ✨ CLIENT PROTECTED ROUTES (Only accessible to Clients) */}
@@ -67,6 +71,8 @@ function App() {
                   <Route path="notifications" element={<ClientNotificationsPage />} />
                   <Route path="quick-reorder" element={<ClientQuickReorderPage />} />
                   <Route path="cart" element={<ClientCart />} />
+                  <Route path="profile" element={<ClientProfilePage />} />
+                  <Route path="offers" element={<ClientOffersPage />} /> {/* ✨ ADDED */}
                 </Route>
               </Route>
 
@@ -76,7 +82,6 @@ function App() {
                   <Route index element={<AdminDashboard />} />
                   <Route path="customers" element={<CustomersPage />} />
                   <Route path="customers/:id" element={<CustomersPage />} />
-                  <Route path="inquiries" element={<InquiriesPage />} />
                   <Route path="orders" element={<OrdersPage />} />
                   <Route path="inventory" element={<InventoryPage />} />
                   <Route path="products" element={<ProductsPage />} />
@@ -86,6 +91,7 @@ function App() {
                   <Route path="support" element={<SupportPage />} />
                   <Route path="notifications" element={<NotificationsPage />} />
                   <Route path="expiry-offers" element={<ExpiryOffersPage />} />
+                  <Route path="settings" element={<AdminSettingsPage />} />
                 </Route>
               </Route>
 

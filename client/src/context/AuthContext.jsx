@@ -2,7 +2,6 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { CognitoUserPool, CognitoUser, AuthenticationDetails } from 'amazon-cognito-identity-js';
 import axios from 'axios';
 
-// ✨ GUARANTEED URL (Matches your api.js)
 const API_BASE_URL = 'http://192.168.1.6:5000';
 
 const poolData = {
@@ -15,33 +14,34 @@ const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [cognitoUser, setCognitoUser] = useState(null);
   const [token, setToken] = useState(null);
-  const [role, setRole] = useState(null);
+  const [role, setRole] = useState(null); // ✨ RESTORED: This was missing!
   const [loading, setLoading] = useState(true);
 
-  const restoreSession = () => {
-    const currentUser = userPool.getCurrentUser();
-    if (!currentUser) {
-      setLoading(false);
-      return;
-    }
+  const authAxios = axios.create({ baseURL: API_BASE_URL });
 
-    currentUser.getSession((err, session) => {
-      if (err || !session.isValid()) {
-        setLoading(false);
-        return;
-      }
-      const idToken = session.getIdToken().getJwtToken();
-      setToken(idToken);
-      setCognitoUser(currentUser);
-      fetchUserProfile(idToken).finally(() => setLoading(false));
-    });
-  };
+  authAxios.interceptors.request.use(
+    (config) => {
+      return new Promise((resolve, reject) => {
+        const cognitoUser = userPool.getCurrentUser();
 
-  useEffect(() => {
-    restoreSession();
-  }, []);
+        if (!cognitoUser) {
+          if (token) config.headers.Authorization = `Bearer ${token}`;
+          return resolve(config);
+        }
+
+        cognitoUser.getSession((err, session) => {
+          if (err || !session.isValid()) {
+            return reject(err);
+          }
+          const currentToken = session.getIdToken().getJwtToken();
+          config.headers.Authorization = `Bearer ${currentToken}`;
+          resolve(config);
+        });
+      });
+    },
+    (error) => Promise.reject(error)
+  );
 
   const fetchUserProfile = async (idToken) => {
     try {
@@ -50,8 +50,16 @@ export const AuthProvider = ({ children }) => {
         {},
         { headers: { Authorization: `Bearer ${idToken}` } }
       );
+      
       setUser(data.profile);
-      setRole(data.role);
+      setRole(data.role); // ✨ RESTORED: Update the role in state
+      
+      if (data.role === 'client' && data.profile && data.profile._id) {
+        localStorage.setItem('clientId', data.profile._id);
+      } else if (data.role === 'admin') {
+        localStorage.removeItem('clientId');
+      }
+
       return data.role;
     } catch (err) {
       console.error('Profile fetch failed:', err);
@@ -60,16 +68,38 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const restoreSession = useCallback(() => {
+    const cognitoUser = userPool.getCurrentUser();
+    if (!cognitoUser) {
+      setLoading(false);
+      return;
+    }
+
+    cognitoUser.getSession((err, session) => {
+      if (err || !session.isValid()) {
+        setLoading(false);
+        return;
+      }
+      const idToken = session.getIdToken().getJwtToken();
+      setToken(idToken);
+      fetchUserProfile(idToken).finally(() => setLoading(false));
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    restoreSession();
+  }, [restoreSession]);
+
   const login = (email, password) => {
     return new Promise((resolve, reject) => {
       const authDetails = new AuthenticationDetails({ Username: email, Password: password });
-      const cogUser = new CognitoUser({ Username: email, Pool: userPool });
+      const cognitoUser = new CognitoUser({ Username: email, Pool: userPool });
 
-      cogUser.authenticateUser(authDetails, {
+      cognitoUser.authenticateUser(authDetails, {
         onSuccess: async (session) => {
           const idToken = session.getIdToken().getJwtToken();
           setToken(idToken);
-          setCognitoUser(cogUser);
           try {
             const userRole = await fetchUserProfile(idToken);
             resolve({ success: true, role: userRole });
@@ -77,20 +107,18 @@ export const AuthProvider = ({ children }) => {
         },
         onFailure: (err) => reject(err),
         newPasswordRequired: () => {
-          resolve({ success: false, challenge: 'NEW_PASSWORD_REQUIRED', cogUser });
-        },
-        totpRequired: () => resolve({ success: false, challenge: 'TOTP', cogUser }),
+          resolve({ success: false, challenge: 'NEW_PASSWORD_REQUIRED', cognitoUser });
+        }
       });
     });
   };
 
-  const completeNewPassword = (cogUser, newPassword) => {
+  const completeNewPassword = (cognitoUser, newPassword) => {
     return new Promise((resolve, reject) => {
-      cogUser.completeNewPasswordChallenge(newPassword, {}, {
+      cognitoUser.completeNewPasswordChallenge(newPassword, {}, {
         onSuccess: async (session) => {
           const idToken = session.getIdToken().getJwtToken();
           setToken(idToken);
-          setCognitoUser(cogUser);
           try {
             const userRole = await fetchUserProfile(idToken);
             resolve({ success: true, role: userRole });
@@ -103,39 +131,27 @@ export const AuthProvider = ({ children }) => {
 
   const logout = useCallback(() => {
     try {
-      const currentUser = userPool.getCurrentUser();
-      if (currentUser) {
-        currentUser.signOut();
+      const cognitoUser = userPool.getCurrentUser();
+      if (cognitoUser) {
+        cognitoUser.signOut();
       }
     } catch (err) {
       console.error("AWS SignOut Error:", err);
     } finally {
-      // 1. Wipe React State
       setUser(null);
-      setCognitoUser(null);
       setToken(null);
-      setRole(null);
-
-      // 2. Wipe Browser Memory (Bulletproof)
+      setRole(null); // ✨ Clear the role on logout
       localStorage.clear();
       sessionStorage.clear();
-
-      // 3. Hard Redirect to the login page (Clears all local cache)
       window.location.replace('/login');
     }
   }, []);
-
-  const authAxios = axios.create({ baseURL: API_BASE_URL });
-  authAxios.interceptors.request.use((config) => {
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-    return config;
-  });
 
   return (
     <AuthContext.Provider value={{
       user, role, token, loading,
       login, logout, completeNewPassword, authAxios,
-      isAuthenticated: !!token && !!user,
+      isAuthenticated: !!token && !!user && !!role, // ✨ Strict check
     }}>
       {children}
     </AuthContext.Provider>
