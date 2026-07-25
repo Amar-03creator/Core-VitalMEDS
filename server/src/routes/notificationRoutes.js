@@ -1,27 +1,24 @@
-// server/src/routes/notificationRoutes.js
 const express = require('express');
 const router = express.Router();
 const Notification = require('../models/Notification');
 
-/* GET /api/notifications?recipientId=&unreadOnly=true
- * Polled by the client every ~30s (per the doc) so status changes on
- * Orders/Inquiries surface without needing WebSockets.
- */
 router.get('/', async (req, res) => {
   try {
-    const { recipientId, unreadOnly } = req.query;
+    // ✨ ADDED recipientRole
+    const { recipientId, recipientRole, unreadOnly } = req.query;
     const match = {};
     if (recipientId) match.recipientId = recipientId;
+    if (recipientRole) match.recipientRole = recipientRole; 
     if (unreadOnly === 'true') match.isRead = false;
 
-    const notifications = await Notification.find(match).sort({ createdAt: -1 }).limit(50);
+    // Fixed limit to 100 to show more history
+    const notifications = await Notification.find(match).sort({ createdAt: -1 }).limit(100);
     res.json({ success: true, data: notifications });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-/* PUT /api/notifications/:id/read */
 router.put('/:id/read', async (req, res) => {
   try {
     const notification = await Notification.findByIdAndUpdate(req.params.id, { isRead: true }, { new: true });
@@ -32,7 +29,15 @@ router.put('/:id/read', async (req, res) => {
   }
 });
 
-module.exports = router;
+// ✨ ADDED: Route to mark ALL as read for a specific role
+router.put('/mark-all-read', async (req, res) => {
+  try {
+    const { recipientRole } = req.body;
+    await Notification.updateMany({ recipientRole, isRead: false }, { isRead: true });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
-// Mount in your app entry:
-//   app.use('/api/notifications', require('./src/routes/notificationRoutes'));
+module.exports = router;

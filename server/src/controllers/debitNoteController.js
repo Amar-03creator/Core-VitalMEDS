@@ -3,7 +3,7 @@ const DebitNote = require('../models/DebitNote');
 const Batch = require('../models/Batch');
 const Product = require('../models/Product');
 const Company = require('../models/Company');
-const { getNextSequence } = require('../helpers/sequenceHelper');
+const { getNextSequence } = require('../helpers/SequenceHelper');
 
 /* ── createDebitNote ──────────────────────────────────────────
    "Return to Company" flow (doc section 4.2):

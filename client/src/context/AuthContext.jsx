@@ -2,11 +2,11 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { CognitoUserPool, CognitoUser, AuthenticationDetails } from 'amazon-cognito-identity-js';
 import axios from 'axios';
 
-const API_BASE_URL = 'http://192.168.1.6:5000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 const poolData = {
-  UserPoolId: 'ap-south-1_t7cmqYdPT',
-  ClientId: '2gomoic0dpgtimj3dg8tfjqceu',
+  UserPoolId: import.meta.env.VITE_COGNITO_USER_POOL_ID,
+  ClientId: import.meta.env.VITE_COGNITO_CLIENT_ID,
 };
 
 const userPool = new CognitoUserPool(poolData);

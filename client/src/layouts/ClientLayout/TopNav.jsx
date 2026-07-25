@@ -1,17 +1,39 @@
-// src/layouts/ClientLayout/TopNav.jsx
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Pill, MessageSquare, Bell, ShoppingCart, CheckCircle2, Clock } from 'lucide-react';
 import { HamburgerButton } from './components/HamburgerButton';
 import { NotificationsDropdown } from './NotificationsDropdown';
-import { demoClientNotifications } from './components/constants';
+import { api } from '../../services/api'; // ✨ Imported real API
 
 export const TopNav = ({ menuOpen, setMenuOpen, notifOpen, setNotifOpen, user }) => {
-  const unreadCount = demoClientNotifications.filter((n) => n.unread).length;
+  const [notifications, setNotifications] = useState([]);
+  
+  // Safe ID extraction
+  const userId = user?._id || user?.id;
+
+  const fetchNotifications = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const res = await api.getClientNotifications(userId);
+      setNotifications(res.data || []);
+    } catch (err) {
+      console.error("Failed to fetch notifications for navbar", err);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
+
+  // ✨ Calculate real unread count
+  const unreadCount = notifications.filter(n => !n.isRead).length;
+
   const isApproved = user?.status === 'Active';
   const establishmentName = user?.establishmentName || 'Pharmacy';
 
   return (
-    <nav data-app-top-nav className="sticky top-0 z-[70] bg-white shadow-sm border-b border-slate-200">
+    // ✨ FIX: Removed conflicting sticky classes here since the parent div in ClientLayout handles it now
+    <nav data-app-top-nav className="bg-white border-b border-slate-200">
       <div className="flex items-center justify-between px-4 h-16">
         <Link to="/client-dashboard" className="flex items-center gap-3 no-underline">
           <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center shadow-sm shrink-0">
@@ -37,7 +59,7 @@ export const TopNav = ({ menuOpen, setMenuOpen, notifOpen, setNotifOpen, user })
             <MessageSquare size={22} />
           </Link>
 
-          {/* Notifications — dropdown modal, never a page */}
+          {/* Notifications — dropdown modal */}
           <div className="relative">
             <button
               onClick={() => { setNotifOpen((o) => !o); setMenuOpen(false); }}
@@ -50,7 +72,13 @@ export const TopNav = ({ menuOpen, setMenuOpen, notifOpen, setNotifOpen, user })
                 </span>
               )}
             </button>
-            {notifOpen && <NotificationsDropdown onClose={() => setNotifOpen(false)} />}
+            {notifOpen && (
+              <NotificationsDropdown 
+                notifications={notifications} 
+                onRefresh={fetchNotifications} 
+                onClose={() => setNotifOpen(false)} 
+              />
+            )}
           </div>
 
           <HamburgerButton open={menuOpen} onClick={() => { setMenuOpen((o) => !o); setNotifOpen(false); }} />

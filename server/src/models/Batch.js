@@ -29,6 +29,20 @@ const batchSchema = new mongoose.Schema({
     isActive: { type: Boolean, default: true },
     nearExpiry: { type: Boolean, default: false },
 
+    // Add this inside your batchSchema in src/models/Batch.js
+    offer: {
+        isActive: { type: Boolean, default: false },
+        minBuyQty: { type: Number, default: 0 },
+        freeQty: { type: Number, default: 0 },
+        discountPercent: { type: Number, default: 0 },
+        discountAmount: { type: Number, default: 0 },
+        offerPTR: { type: Number, default: null },
+        description: { type: String, default: '' },
+        startDate: { type: Date, default: Date.now },
+        endDate: { type: Date, default: null },
+        lastToggleDate: { type: Date, default: null }
+    },
+
     purchaseLots: [purchaseLotSchema],
 }, { timestamps: true });
 

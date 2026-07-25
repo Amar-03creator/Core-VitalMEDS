@@ -66,9 +66,11 @@ exports.createPaymentReceipt = async (req, res) => {
       return res.status(404).json({ message: "Client not found" });
     }
 
+    // ✨ FIXED: Never allocate incoming payments to a cancelled invoice
     const unpaidInvoices = await SalesInvoice.find({
       clientObjectId: new mongoose.Types.ObjectId(clientObjectId),
       paymentStatus: { $in: ['UNPAID', 'PARTIALLY_PAID'] },
+      invoiceStatus: { $ne: 'CANCELLED' } 
     }).sort({ invoiceDate: 1 });
 
     let remainingAmount = totalAmountPaid;
@@ -170,9 +172,11 @@ exports.updatePaymentReceipt = async (req, res) => {
             const client = await Client.findById(receipt.clientObjectId).session(session);
             const newAmount = totalAmountPaid !== undefined ? parseFloat(totalAmountPaid) : receipt.totalAmountPaid;
 
+            // ✨ FIXED: Prevent re-allocating to a cancelled bill during an edit
             const unpaidInvoices = await SalesInvoice.find({
                 clientObjectId: client._id,
                 paymentStatus: { $in: ['UNPAID', 'PARTIALLY_PAID'] },
+                invoiceStatus: { $ne: 'CANCELLED' }
             }).sort({ invoiceDate: 1 }).session(session);
 
             let remaining = newAmount;
@@ -257,9 +261,11 @@ exports.reconcileClientLedger = async (req, res) => {
         const client = await Client.findById(clientObjectId);
         if (!client) return res.status(404).json({ message: "Client not found" });
 
+        // ✨ FIXED: Ensure the true debt calculation ignores voided bills
         const unpaidInvoices = await SalesInvoice.find({
             clientObjectId: new mongoose.Types.ObjectId(clientObjectId),
-            paymentStatus: { $in: ['UNPAID', 'PARTIALLY_PAID'] }
+            paymentStatus: { $in: ['UNPAID', 'PARTIALLY_PAID'] },
+            invoiceStatus: { $ne: 'CANCELLED' }
         });
 
         let trueDebt = 0;

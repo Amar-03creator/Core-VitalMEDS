@@ -1,4 +1,4 @@
-// src/models/Client.js
+// server/src/models/Client.js
 const mongoose = require('mongoose');
 
 const clientSchema = new mongoose.Schema({
@@ -10,7 +10,7 @@ const clientSchema = new mongoose.Schema({
         uppercase: true,
         match: /^[0-9A-Z]{3}$/,
     },
-    businessType: { type: String, enum: ['Retail', 'Wholesale' , 'Hospital', 'Clinic'], required: true },
+    businessType: { type: String, enum: ['Retail', 'Wholesale', 'Hospital', 'Clinic'], required: true },
     status: {
         type: String,
         enum: ['Pending', 'Active', 'Static', 'Credit Alert', 'Suspended'],
@@ -21,11 +21,15 @@ const clientSchema = new mongoose.Schema({
     deliveryRoute: String,
 
     /*
-     * line — the sales route/territory this client belongs to (e.g.
-     * "Line 1", "Berhampur Town", "North Route"). Used by the Payments
-     * tab filter: selecting a line narrows the City dropdown to only
-     * cities that exist on that line, and narrows the Party dropdown
-     * to only clients on that line (optionally further narrowed by city).
+     * lastInquiryDate — calendar date this client last submitted an inquiry.
+     * Enforces "one inquiry per day". Reset to null when a Pending, 
+     * not-yet-Viewed inquiry is deleted.
+     */
+    lastInquiryDate: Date,
+
+    /*
+     * line — the sales route/territory this client belongs to.
+     * Used by the Payments tab filter.
      */
     line: { type: String, trim: true },
 
@@ -51,8 +55,8 @@ const clientSchema = new mongoose.Schema({
 
     gstin: {
         type: String,
-        required: function() { 
-            return !this.aadhaarNumber; 
+        required: function () {
+            return !this.aadhaarNumber;
         },
         unique: true,
         uppercase: true,
@@ -72,11 +76,55 @@ const clientSchema = new mongoose.Schema({
     documentUrls: {
         gstCert: String,
         dlCert: String,
-        aadhaarCard: String
+        aadhaarCard: String,
+        panCard: String
     },
     documentsVerifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
     documentsVerifiedAt: Date,
+
+    // Used to store the reason an ACCOUNT was suspended/rejected. 
     documentIssues: [String],
+
+    // ── Per-document verification status (admin-set, one flag per type) ──
+    documentVerification: {
+        gstCert: { type: Boolean, default: false },
+        dlCert: { type: Boolean, default: false },
+        aadhaarCard: { type: Boolean, default: false },
+        panCard: { type: Boolean, default: false }
+    },
+
+    // ── Has this document type ever been uploaded? ──
+    documentFirstUploaded: {
+        gstCert: { type: Boolean, default: false },
+        dlCert: { type: Boolean, default: false },
+        aadhaarCard: { type: Boolean, default: false },
+        panCard: { type: Boolean, default: false }
+    },
+
+    // ✨ BEST OF BOTH WORLDS: Embedded Document Requests ✨
+    documentRequests: [{
+        documentType: { type: String, enum: ['gstCert', 'dlCert', 'aadhaarCard', 'panCard', 'other'], default: 'other' },
+        message: { type: String, required: true }, // The message/reason shown to the client
+        isActive: { type: Boolean, default: true }, // Client only sees isActive: true
+        status: { type: String, enum: ['pending', 'approved', 'rejected', 'completed', 'dismissed'], default: 'pending' },
+        requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
+        requestedAt: { type: Date, default: Date.now },
+        
+        approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
+        approvedAt: Date,
+        
+        resolvedAt: Date, // When swept up or dismissed
+        resolvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
+        resolutionReason: { type: String, enum: ['dismissed', 'client_approved', 'uploaded'] },
+        
+        rejectionNote: String,
+        completedAt: Date,
+        newFileKey: String,
+        oldFileKey: String
+    }],
+
+    accountApprovedAt: Date,
+    businessTypeChangedAt: Date,
 
     creditLimit: { type: Number, default: 0 },
     paymentTermsDays: { type: Number, default: 0 },
@@ -91,36 +139,27 @@ const clientSchema = new mongoose.Schema({
     riskTier: { type: String, enum: ['Green', 'Yellow', 'Red'], default: 'Green' },
     partyTier: { type: String, enum: ['Diamond', 'Platinum', 'Gold', 'Silver'], default: 'Silver' },
 
+    inviteCode: {
+        type: String,
+        unique: true,
+        sparse: true,
+    },
+    inviteCodeExpiry: Date,
+    isClaimed: {
+        type: Boolean,
+        default: false
+    }, 
+
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' }
 }, {
     timestamps: true,
-    // Needed so the two virtuals below actually appear in API responses
-    // (res.json(client) / JSON.stringify(client) call toJSON() under the hood).
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
 });
 
-// Index for fast line/city filtering on the Payments tab
 clientSchema.index({ line: 1, city: 1 });
 
-/*
- * isApproved / isSuspended — computed, never stored.
- *
- * These exist so the customer-facing frontend (Products page gating,
- * Cart "Order Now" tab access) can read a plain boolean exactly as the
- * UI spec expects, instead of re-deriving it from the status string in
- * five different components. They're virtuals, not persisted fields, so
- * there's no migration and no risk of drifting out of sync with `status`
- * — approveClient / rejectClient / requestSuspendOtp / verifySuspendOtp /
- * reactivateClient in clientController.js don't need to change at all.
- *
- * 'Static' and 'Credit Alert' are deliberately NOT folded in here — they
- * don't gate anything in the customer-facing flow (the credit-limit check
- * there compares totalOutstanding vs creditLimit directly). If you want
- * them as their own derived flags later, add separate virtuals for them
- * rather than overloading these two.
- */
 clientSchema.virtual('isApproved').get(function () {
     return this.status === 'Active';
 });

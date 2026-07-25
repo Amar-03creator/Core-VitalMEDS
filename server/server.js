@@ -1,77 +1,99 @@
-// Import the Express library
+// server/server.js
+// Import core libraries
 const express = require('express');
-
-// Import the function to connect to the database
-const connectDB = require('./src/config/db');
-
-// Load environment variables from the .env file
+const cors = require('cors');
+const mongoose = require('mongoose');
 require('dotenv').config();
 
-// Initialize the Express application
+// ✨ CLOUD ADDITION: The Serverless Wrapper
+const serverless = require('serverless-http');
+
+// Database connection
+const connectDB = require('./src/config/db');
+
+// Initialize Express
 const app = express();
-connectDB(); // Connect to the database before starting the server
 
+// Connect to the database
+connectDB(); 
 
-// Define the port our server will listen on. 
-// We use 5000 as a standard development port for backends.
-const PORT = process.env.PORT || 5000;
+// TEMPORARY CLEANUP SCRIPT 
+mongoose.connection.once('open', async () => {
+    try {
+        await mongoose.connection.collection('orders').dropIndex('orderNumber_1');
+        console.log('✅ Successfully dropped old orderNumber ghost index!');
+    } catch (err) {
+        // Ignore errors if the index is already dropped
+    }
+    
+    try {
+        await mongoose.connection.collection('inquiries').dropIndex('inquiryNumber_1');
+        console.log('✅ Successfully dropped old inquiryNumber ghost index!');
+    } catch (err) {}
+});
 
-// Middleware: This tells Express to automatically parse incoming data as JSON.
-// When your React frontend sends data (like a login email/password), this makes it readable.
-app.use(express.json());
-const cors = require('cors');  // Import the CORS middleware to handle cross-origin requests
-app.use(cors());    // Enable CORS for all routes, allowing requests from any origin. This is useful during development when your frontend and backend are on different ports.
-const companyRoutes = require('./src/routes/companyRoutes');
-const productRoutes = require('./src/routes/productRoutes');
-const purchaseBillRoutes = require('./src/routes/purchaseBillRoutes');
-const salesInvoiceRoutes = require('./src/routes/salesInvoiceRoutes');
-const clientRoutes = require('./src/routes/clientRoutes');
-const paymentReceiptRoutes = require('./src/routes/paymentReceiptRoutes');
-const drugLicenseRoutes = require('./src/routes/drugLicenseRoutes');
-const duplicateRoutes = require('./src/routes/duplicateRoutes');
-const phoneRoutes = require('./src/routes/phoneRoutes');
-const productBatchRoutes = require('./src/routes/productBatchRoutes');
-const ledgerRoutes = require('./src/routes/ledgerRoutes');
-const dashboardRoutes = require('./src/routes/dashboardRoutes');
-const auditRoutes = require('./src/routes/auditRoutes');
-const replenishmentRoutes = require('./src/routes/replenishmentRoutes');
-const debitNoteRoutes = require('./src/routes/debitNoteRoutes');
-const authRoutes = require('./src/routes/authRoutes');
+// Middleware
+app.use(cors()); // Allow requests from your React frontend
+app.use(express.json()); // Parse incoming JSON payloads
 
-
-
-
-// Tell Express: "If a URL starts with /api/companies, send it to the companyRoutes file"
-app.use('/api/companies', companyRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/purchase-bills', purchaseBillRoutes);
-app.use('/api/sales-invoices', salesInvoiceRoutes);
-app.use('/api/clients', clientRoutes);
-app.use('/api/payment-receipts', paymentReceiptRoutes);
-app.use('/api/drug-licenses', drugLicenseRoutes);
-app.use('/api/duplicates', duplicateRoutes);
-app.use('/api/phones', phoneRoutes);
-app.use('/api/products-with-batches', productBatchRoutes);  
-app.use('/api/ledger', ledgerRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/audit', require('./src/routes/auditRoutes'));
-app.use('/api/replenishment', replenishmentRoutes);
-app.use('/api/debit-notes', debitNoteRoutes);
+// ── API ROUTES ────────────────────────────────────────────────────────
+// Authentication & Profiles
 app.use('/api/auth', require('./src/routes/authRoutes'));
+app.use('/api/admin', require('./src/routes/adminRoutes'));
+app.use('/api/clients', require('./src/routes/clientRoutes'));
 
+// Inventory & Catalog
+app.use('/api/companies', require('./src/routes/companyRoutes'));
+app.use('/api/products', require('./src/routes/productRoutes'));
+app.use('/api/products-with-batches', require('./src/routes/productBatchRoutes'));  
+app.use('/api/stock', require('./src/routes/stockRoutes'));
 
+// Transactions & Orders
+app.use('/api/purchase-bills', require('./src/routes/purchaseBillRoutes'));
+app.use('/api/sales-invoices', require('./src/routes/salesInvoiceRoutes'));
+app.use('/api/orders', require('./src/routes/orderRoutes'));
+app.use('/api/inquiries', require('./src/routes/inquiryRoutes'));
+app.use('/api/payment-receipts', require('./src/routes/paymentReceiptRoutes'));
+app.use('/api/debit-notes', require('./src/routes/debitNoteRoutes'));
+app.use('/api/billing', require('./src/routes/billingRoutes'));
 
-// Create a basic test route (an endpoint)
-// When a browser or frontend sends a GET request to the root URL ('/'), run this function.
+// Analytics & System
+app.use('/api/ledger', require('./src/routes/ledgerRoutes'));
+app.use('/api/dashboard', require('./src/routes/dashboardRoutes'));
+app.use('/api/audit', require('./src/routes/auditRoutes'));
+app.use('/api/replenishment', require('./src/routes/replenishmentRoutes'));
+app.use('/api/notifications', require('./src/routes/notificationRoutes'));
+
+// Utilities
+app.use('/api/drug-licenses', require('./src/routes/drugLicenseRoutes'));
+app.use('/api/duplicates', require('./src/routes/duplicateRoutes'));
+app.use('/api/phones', require('./src/routes/phoneRoutes'));
+// ──────────────────────────────────────────────────────────────────────
+
+// Health check endpoint
 app.get('/', (req, res) => {
-    res.send('VitalMEDS API is running successfully!');
+    res.send('VitalMEDS API is running successfully on AWS Serverless!');
 });
 
-// Tell the server to start listening for incoming requests
-app.listen(PORT, () => {
-    console.log(`Server is up and running on http://localhost:${PORT}`);
+// ✨ CLOUD ADDITION: Global Error Handler Middleware
+// This catches all unhandled errors so API Gateway returns clean JSON instead of crashing
+app.use((err, req, res, next) => {
+    console.error('Unhandled Error caught by global middleware:', err);
+    res.status(err.status || 500).json({
+        success: false,
+        message: err.message || 'Internal Server Error',
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
 });
 
+// ✨ CLOUD FIX: Conditionally start the server
+// If running locally, use app.listen(). If on AWS, skip this so Lambda can manage it.
+if (process.env.NODE_ENV !== 'production') {
+    const PORT = process.env.PORT || 5000;
+    app.listen(PORT, () => {
+        console.log(`Local Server is up and running on http://localhost:${PORT}`);
+    });
+}
 
-
-
+// ✨ CLOUD ADDITION: Export the wrapped app for AWS Lambda
+module.exports.handler = serverless(app);

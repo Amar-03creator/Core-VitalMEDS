@@ -1,3 +1,4 @@
+// server/src/models/SalesInvoice.js
 const mongoose = require('mongoose');
 
 const lotConsumptionSchema = new mongoose.Schema({
@@ -50,7 +51,7 @@ const salesInvoiceSchema = new mongoose.Schema({
         taxableValue: { type: Number, required: true },
         cgst: { type: Number, default: 0 },
         sgst: { type: Number, default: 0 },
-        igst: { type: Number, default: 0 },   // ★ new
+        igst: { type: Number, default: 0 },
         lineTotal: { type: Number, required: true },
 
         lotConsumption: [lotConsumptionSchema],
@@ -66,7 +67,7 @@ const salesInvoiceSchema = new mongoose.Schema({
     totalTaxable: { type: Number, required: true },
     totalCGST: { type: Number, default: 0 },
     totalSGST: { type: Number, default: 0 },
-    totalIGST: { type: Number, default: 0 },    // ★ new
+    totalIGST: { type: Number, default: 0 },
     totalGST: { type: Number, required: true },
     roundOff: { type: Number, default: 0 },
     netAmount: { type: Number, required: true },
@@ -83,7 +84,14 @@ const salesInvoiceSchema = new mongoose.Schema({
         type: String,
         enum: ['UNPAID', 'PARTIALLY_PAID', 'PAID', 'ON_HOLD', 'DISPUTED'],
         default: 'UNPAID'
-    }
+    },
+
+    // Set when the admin modified an existing order while invoicing
+    modificationNote: String,
+
+    // Used by order cancel/cancel-invoice flows
+    cancellationReason: String,
+    cancelledAt: Date,
 }, { timestamps: true });
 
 module.exports = mongoose.model('SalesInvoice', salesInvoiceSchema);

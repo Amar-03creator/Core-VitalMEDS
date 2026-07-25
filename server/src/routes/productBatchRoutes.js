@@ -1,4 +1,3 @@
-// server/src/routes/productBatchRoutes.js
 const express = require('express');
 const router = express.Router();
 const productBatchController = require('../controllers/productBatchController');
@@ -11,5 +10,9 @@ router.get('/inventory', productBatchController.getInventory);
 
 // 3. The PTR update route for a specific batch
 router.put('/batches/:id/ptr', productBatchController.updateBatchPTR);
+
+// 4. ✨ FIX: The Unified Offers Route
+router.get('/offers', productBatchController.getOffersList);
+router.put('/offers/:id', productBatchController.updateBatchOffer);
 
 module.exports = router;

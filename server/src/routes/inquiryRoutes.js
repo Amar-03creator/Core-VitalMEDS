@@ -1,19 +1,23 @@
 // server/src/routes/inquiryRoutes.js
 const express = require('express');
 const router = express.Router();
+const { authenticate, requireAdmin } = require('../middleware/authMiddleware');
 const inquiryController = require('../controllers/inquiryController');
+
+// Ensure all routes require a valid token
+router.use(authenticate);
 
 router.post('/', inquiryController.createInquiry);
 router.get('/', inquiryController.getInquiries);
 router.get('/:id', inquiryController.getInquiryById);
-router.put('/:id', inquiryController.updateInquiry);
-router.put('/:id/cancel', inquiryController.cancelInquiry);
-router.put('/:id/seen', inquiryController.markSeen);
-router.put('/:id/quote', inquiryController.sendQuote);
+
+router.delete('/:id', inquiryController.deleteInquiry);
+
+// Admin-only actions protected by the guard
+router.put('/:id/viewed', requireAdmin, inquiryController.markViewed);
+router.put('/:id/quote', requireAdmin, inquiryController.sendQuote);
+
+// Both roles can reject, the controller handles the distinction
 router.put('/:id/reject', inquiryController.rejectInquiry);
-router.put('/:id/request-changes', inquiryController.requestChanges);
 
 module.exports = router;
-
-// Mount in your app entry:
-//   app.use('/api/inquiries', require('./src/routes/inquiryRoutes'));

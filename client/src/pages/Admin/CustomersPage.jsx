@@ -3,8 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { api } from '../../services/api';
+import { api } from '../../services/api'; // ✨ Relying purely on our secure, modular API
 import { useBackHandler } from '../../hooks/useBackHandler';
 import { useCustomers } from '../../features/Admin/CustomersPage/hooks/useCustomers';
 import { CustomerKPICards } from '../../features/Admin/CustomersPage/components/CustomerKPICards';
@@ -73,47 +72,12 @@ export const CustomersPage = () => {
   const cardRefMap = useRef(new Map());
   const [approvingId, setApprovingId] = useState(null);
 
-const handleApproveClient = async (clientId, establishmentName) => {
-  setApprovingId(clientId);
-  try {
-    // 1. Grab the secure admin token from localStorage
-    const token = localStorage.getItem('accessToken');
-    
-    // 2. Fire the PUT request to your backend admin controller
-    const response = await axios.put(
-      `http://localhost:5000/api/clients/${clientId}/approve`, 
-      {}, 
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'x-user-role': 'admin' // Matches our isAdmin check in authMiddleware
-        }
-      }
-    );
-
-    if (response.data.success) {
-      toast.success(`Successfully approved ${establishmentName}! Credentials have been emailed.`);
-      
-      // 3. Refresh your UI state here (e.g., fetchCustomers() or filter out the approved client)
-    }
-  } catch (error) {
-    console.error("Approval failed:", error);
-    toast.error(error.response?.data?.message || "Failed to approve customer.");
-  } finally {
-    setApprovingId(null);
-  }
-};
-
-
-
   const { top: topNavH, bottom: bottomNavH } = useNavHeights();
 
   useEffect(() => {
     if (detailId) sessionStorage.setItem(STORAGE_DETAIL_ID, detailId);
     else sessionStorage.removeItem(STORAGE_DETAIL_ID);
   }, [detailId]);
-
-
 
   useEffect(() => {
     const shouldLock = phase === 'expanding' || phase === 'collapsing';
@@ -137,13 +101,6 @@ const handleApproveClient = async (clientId, establishmentName) => {
     });
   }, []);
 
-  // Triggered either by a real back-press (via the layer's onBackClose,
-  // routed through the NavStack) or programmatically (e.g. after a
-  // suspend confirmation). Either way, this only drives the visual
-  // collapse — the history entry itself is reclaimed by the effect
-  // below's cleanup, via pop(), which correctly no-ops if a real back
-  // press already consumed the entry.
-  // Triggered either by a real back-press or programmatically.
   // Triggered either by a real back-press or programmatically.
   const startCollapse = useCallback(() => {
     let targetRect = cardRect;
@@ -154,12 +111,11 @@ const handleApproveClient = async (clientId, establishmentName) => {
       const cardElement = cardRefMap.current.get(detailId);
       if (cardElement) {
         targetRect = cardElement.getBoundingClientRect();
-        setCardRect(targetRect); // Inject it back into state for the CSS transition
+        setCardRect(targetRect);
       }
     }
 
-    // 2. FAILSAFE: If the card still isn't in the DOM (e.g., if you have pagination 
-    // and they are on a different page), gracefully fallback to instant close.
+    // 2. FAILSAFE: If the card still isn't in the DOM (e.g., pagination change), gracefully fallback.
     if (!targetRect) {
       setPhase('list');
       setDetailId(null);
@@ -171,8 +127,7 @@ const handleApproveClient = async (clientId, establishmentName) => {
     // 3. Normal behavior: trigger the CSS shrink animation
     setExpanded(false);
     setPhase('collapsing');
-  }, [cardRect, detailId]); // <-- Make sure detailId is in the dependency array!
-
+  }, [cardRect, detailId]); 
 
   // We pass 'custDetail' as the static ID. 
   useBackHandler(phase === 'detail', startCollapse, 'custDetail');
@@ -198,28 +153,17 @@ const handleApproveClient = async (clientId, establishmentName) => {
 
   const showOverlay = phase !== 'list';
 
+  // ✨ Cleaned up API Call utilizing our modular structure
   const handleApprove = async (customer) => {
     setApprovingId(customer._id);
     try {
-      const token = localStorage.getItem('accessToken');
-      const response = await axios.put(
-        `http://localhost:5000/api/clients/${customer._id}/approve`, 
-        {}, 
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'x-user-role': 'admin'
-          }
-        }
-      );
-
-      if (response.data.success) {
-        toast.success(`Successfully approved ${customer.establishmentName}! Credentials emailed.`);
-        refetch();
-      }
+      await api.approveClient(customer._id);
+      toast.success(`Successfully approved ${customer.establishmentName}! Credentials emailed.`);
+      startCollapse();
+      refetch();
     } catch (error) {
       console.error("Approval failed:", error);
-      toast.error(error.response?.data?.message || "Failed to approve customer.");
+      toast.error(error.message || 'Failed to approve customer.');
     } finally {
       setApprovingId(null);
     }
@@ -230,8 +174,13 @@ const handleApproveClient = async (clientId, establishmentName) => {
       await api.rejectClient(customer._id, reason);
       toast.success(`${customer.establishmentName} rejected`);
       setRejectTarget(null);
+      
+      // Close the detail view if the action originated from inside it
+      if (detailId === customer._id) startCollapse(); 
       refetch();
-    } catch (err) { toast.error(err.message); }
+    } catch (err) { 
+      toast.error(err.message); 
+    }
   };
 
   const handleSuspendConfirm = async (customer) => {
@@ -241,7 +190,9 @@ const handleApproveClient = async (clientId, establishmentName) => {
       setSuspendTarget(null);
       startCollapse();
       refetch();
-    } catch (err) { toast.error(err.message); }
+    } catch (err) { 
+      toast.error(err.message); 
+    }
   };
 
   return (
@@ -261,9 +212,11 @@ const handleApproveClient = async (clientId, establishmentName) => {
 
         <CustomerKPICards kpis={kpis} />
         <SearchBar 
-        search={search} 
-        onSearchChange={setSearch} 
-        onFilterOpen={() => setFilterOpen(true)} activeFilterCount={activeFilterCount} />
+          search={search} 
+          onSearchChange={setSearch} 
+          onFilterOpen={() => setFilterOpen(true)} 
+          activeFilterCount={activeFilterCount} 
+        />
 
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
@@ -298,6 +251,7 @@ const handleApproveClient = async (clientId, establishmentName) => {
             clientId={detailId}
             customer={detailCustomer}
             onApprove={handleApprove}
+            onReject={(c) => setRejectTarget(c)} // ✨ Restored for the TakeActionModal inside DetailPage
             onListChange={() => {
               startCollapse();
               refetch();

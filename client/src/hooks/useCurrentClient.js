@@ -2,15 +2,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api';
 
-/**
- * NOTE — placeholder auth wiring: this reads the logged-in client's id
- * from localStorage('clientId'), since there's no AuthContext in what's
- * been shared so far. Swap the `getClientId()` body below for however
- * your login flow actually stores the session (JWT decode, a real
- * AuthContext, etc.) — nothing else in this hook, or in the components
- * that consume it, needs to change.
- */
 const getClientId = () => localStorage.getItem('clientId');
+
+const isSameCalendarDay = (a, b) => {
+  if (!a || !b) return false;
+  const da = new Date(a);
+  const db = new Date(b);
+  return da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth() && da.getDate() === db.getDate();
+};
 
 export function useCurrentClient() {
   const [client, setClient] = useState(null);
@@ -24,42 +23,41 @@ export function useCurrentClient() {
       setError('No logged-in client found.');
       return;
     }
+    
     setLoading(true);
     try {
       const res = await api.getClientById(clientId);
-      setClient(res.data);
+      // Depending on your backend response structure, it might be nested in `data`
+      setClient(res.data || res);
       setError(null);
     } catch (err) {
+      console.error("Fetch client error:", err);
       setError(err.message);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { refetch(); }, [refetch]);
+  useEffect(() => { 
+    refetch(); 
+  }, [refetch]);
 
-  // return {
-  //   client,
-  //   clientId: client?._id || getClientId(),
-  //   // Client.js exposes these as virtuals (status === 'Active' / 'Suspended')
-  //   // — see server/src/models/Client.js.
-  //   isApproved: !!client?.isApproved,
-  //   isSuspended: !!client?.isSuspended,
-  //   creditLimit: client?.creditLimit || 0,
-  //   totalOutstanding: client?.totalOutstanding || 0,
-  //   loading,
-  //   error,
-  //   refetch,
-  // };
-
+  /* ── REAL PRODUCTION RETURN ─────────────────────────────────────────── */
   return {
     client,
     clientId: client?._id || getClientId(),
-    // MOCKED FOR DEMO: Hardcoding to true so you can access Order tabs
-    isApproved: true,
-    isSuspended: false,
-    creditLimit: client?.creditLimit || 500000, // Optional: Give yourself a fake credit limit to test
+    
+    // Gating strictly enforced by MongoDB 'status' field
+    isApproved: !!client?.isApproved,
+    isSuspended: !!client?.isSuspended,
+    
+    // Financials pulled directly from the client document
+    creditLimit: client?.creditLimit || 0,
     totalOutstanding: client?.totalOutstanding || 0,
+    
+    // Inquiry gating based on exact timestamp in DB
+    hasSentInquiryToday: isSameCalendarDay(client?.lastInquiryDate, new Date()),
+    
     loading,
     error,
     refetch,

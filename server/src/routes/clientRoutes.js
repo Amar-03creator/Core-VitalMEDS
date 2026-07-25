@@ -1,6 +1,8 @@
 // server/src/routes/clientRoutes.js
 const express = require('express');
 const router  = express.Router();
+const { authenticate, authorize } = require('../middleware/authMiddleware');
+
 const {
   getAllClients,
   getClientById,
@@ -15,50 +17,61 @@ const {
   checkDuplicate,
   requestSuspendOtp, 
   verifySuspendOtp,
-  reactivateClient
+  reactivateClient,
+  // ✨ Added embedded document request controllers ✨
+  createDocumentRequest,
+  getActiveDocumentRequests,
+  resolveDocumentRequest
 } = require('../controllers/clientController');
 
-
-// TODO: add your auth middleware (e.g. requireAdmin) before each route in production
+const {
+  getMyProfile,
+  updateMyProfile,
+  requestDocumentUpload,
+  getDocumentUploadTicket,
+  confirmDocumentUpload,
+} = require('../controllers/clientSelfController');
 
 // ── Directory ──────────────────────────────────────────────────────────
-// GET    /api/clients?search=&status=&businessType=&tier=&riskTier=&minScore=&maxScore=
-router.get('/',    getAllClients);
-// POST   /api/clients
-router.post('/',   createClient);
+router.get('/', authenticate, authorize('admin'), getAllClients);
+router.post('/', authenticate, authorize('admin'), createClient);
 
-// ✨ ADDED: Duplicate Checker (MUST be above /:id routes so 'duplicates' isn't treated as an ID)
-// GET    /api/clients/duplicates/check?field=...&value=...
+// ✨ Duplicate Checker (MUST be above /:id routes so 'duplicates' isn't treated as an ID)
 router.get('/duplicates/check', checkDuplicate);
 
+// ── Client self-service ("me") ──────────────────────────────────────────
+// MUST be above /:id so Express doesn't treat "me" as an ObjectId.
+router.get('/me', authenticate, authorize('client'), getMyProfile);
+router.put('/me', authenticate, authorize('client'), updateMyProfile);
+router.post('/me/documents/request', authenticate, authorize('client'), requestDocumentUpload);
+router.get('/me/documents/upload-ticket', authenticate, authorize('client'), getDocumentUploadTicket);
+router.post('/me/documents/confirm', authenticate, authorize('client'), confirmDocumentUpload);
+
 // ── Single client ──────────────────────────────────────────────────────
-// GET    /api/clients/:id
-router.get('/:id',          getClientById);
-// PUT    /api/clients/:id
-router.put('/:id',          updateClient);
+router.get('/:id', authenticate, authorize('admin', 'client'), getClientById);
+router.put('/:id', authenticate, authorize('admin'), updateClient);
 
 // ── Workflow actions ───────────────────────────────────────────────────
-// PUT    /api/clients/:id/approve
-router.put('/:id/approve',  approveClient);
-// PUT    /api/clients/:id/reject     body: { reason? }
-router.put('/:id/reject',   rejectClient);
-// PUT    /api/clients/:id/status     body: { status }
-router.put('/:id/status',   updateClientStatus);
+router.put('/:id/approve', authenticate, authorize('admin'), approveClient);
+router.put('/:id/reject', authenticate, authorize('admin'), rejectClient);
+router.put('/:id/status', authenticate, authorize('admin'), updateClientStatus);
 
 // ── Activity sub-resources (lazy-loaded by tabs) ───────────────────────
-// GET    /api/clients/:id/invoices
-router.get('/:id/invoices', getClientInvoices);
-// GET    /api/clients/:id/payments
-router.get('/:id/payments', getClientPayments);
-// GET    /api/clients/:id/orders
-router.get('/:id/orders',   getClientOrders);
+router.get('/:id/invoices', authenticate, authorize('admin', 'client'), getClientInvoices);
+router.get('/:id/payments', authenticate, authorize('admin', 'client'), getClientPayments);
+router.get('/:id/orders', authenticate, authorize('admin', 'client'), getClientOrders);
 
+// ── OTP Suspension Routes ──────────────────────────────────────────────
+router.post('/:id/suspend/request-otp', authenticate, authorize('admin'), requestSuspendOtp);
+router.post('/:id/suspend/verify-otp', authenticate, authorize('admin'), verifySuspendOtp);
+router.put('/:id/reactivate', authenticate, authorize('admin'), reactivateClient);
 
-// ADDED: OTP Suspension Routes
-router.post('/:id/suspend/request-otp', requestSuspendOtp);
-router.post('/:id/suspend/verify-otp', verifySuspendOtp);
-// PUT    /api/clients/:id/reactivate
-router.put('/:id/reactivate', reactivateClient);
-
+// ── Document Requests (Embedded Array) ─────────────────────────────────
+// POST: Admin creates a request
+router.post('/:id/document-requests', authenticate, authorize('admin'), createDocumentRequest);
+// GET: Admin or Client views active requests
+router.get('/:id/document-requests', authenticate, authorize('admin', 'client'), getActiveDocumentRequests);
+// PUT: Admin explicitly dismisses a request
+router.put('/:id/document-requests/:requestId/resolve', authenticate, authorize('admin'), resolveDocumentRequest);
 
 module.exports = router;

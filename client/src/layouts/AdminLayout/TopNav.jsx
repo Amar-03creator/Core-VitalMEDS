@@ -1,12 +1,38 @@
 // src/layouts/AdminLayout/TopNav.jsx
+import { useState, useEffect, useCallback } from 'react';
 import { Pill, MessageSquare, Bell } from 'lucide-react';
 import { HamburgerButton } from './components/HamburgerButton';
 import { NotificationsDropdown } from './components/NotificationsDropdown';
 import { MessagesDropdown } from './components/MessagesDropdown';
-import { demoNotifications, demoTickets } from './constants';
+import { demoTickets } from './constants'; // Keep tickets demo for now
+import { api } from '../../services/api';
 
 export const TopNav = ({ menuOpen, setMenuOpen, notifOpen, setNotifOpen, messagesOpen, setMessagesOpen }) => {
-  const totalUnreadNotif = demoNotifications.filter(n => n.unread).length;
+  const [notifications, setNotifications] = useState([]);
+  
+  // Real Notification Fetching
+  const fetchNotifs = useCallback(async () => {
+    try {
+      // By default, this gets the latest 50-100 notifications for the admin
+      const res = await api.getAdminNotifications();
+      if (res.data) setNotifications(res.data);
+    } catch (err) {
+      console.error("Failed to load topnav notifications", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchNotifs();
+    
+    // ✨ Smart Polling: Automatically check for new notifications every 30 seconds
+    const interval = setInterval(() => {
+      fetchNotifs();
+    }, 30000); 
+
+    return () => clearInterval(interval);
+  }, [fetchNotifs]);
+
+  const totalUnreadNotif = notifications.filter(n => !n.isRead).length;
   const totalUnreadTickets = demoTickets.filter(t => t.unread).length;
 
   return (
@@ -42,7 +68,7 @@ export const TopNav = ({ menuOpen, setMenuOpen, notifOpen, setNotifOpen, message
           {/* Notifications button */}
           <div className="relative">
             <button
-              onClick={() => { setNotifOpen(o => !o); setMessagesOpen(false); setMenuOpen(false); }}
+              onClick={() => { setNotifOpen(o => !o); setMessagesOpen(false); setMenuOpen(false); fetchNotifs(); }}
               className={`relative p-2.5 rounded-xl transition-colors ${notifOpen ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
             >
               <Bell size={20} />
@@ -52,7 +78,13 @@ export const TopNav = ({ menuOpen, setMenuOpen, notifOpen, setNotifOpen, message
                 </span>
               )}
             </button>
-            {notifOpen && <NotificationsDropdown onClose={() => setNotifOpen(false)} />}
+            {notifOpen && (
+              <NotificationsDropdown 
+                notifications={notifications} 
+                onRefresh={fetchNotifs} // Allows dropdown to tell TopNav to update the red badge
+                onClose={() => setNotifOpen(false)} 
+              />
+            )}
           </div>
 
           {/* Menu button */}

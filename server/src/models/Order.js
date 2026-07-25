@@ -1,38 +1,69 @@
+// server/src/models/Order.js
 const mongoose = require('mongoose');
+
 const orderSchema = new mongoose.Schema({
     orderId: { type: String, required: true, unique: true },
     clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'Client', required: true },
     inquiryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Inquiry', default: null },
 
-    /*
-     * isCancellable — admin-only manual override, defaults true.
-     * The normal cancel rule is purely status-based (Placed/Confirmed/
-     * Invoiced = cancellable, Shipped/Delivered = not — see orderController
-     * .cancelOrder). This flag exists only so an admin can lock cancellation
-     * early (e.g. the moment picking starts) even before the order reaches
-     * Invoiced. It is never flipped false automatically.
-     */
     isCancellable: { type: Boolean, default: true },
-    adminCancelReason: String, clientCancelReason: String,
-    status: { type: String, enum: ['Placed', 'Confirmed', 'Invoiced', 'Shipped', 'Delivered', 'Cancelled'], default: 'Placed' },
+    adminCancelReason: String,
+    clientCancelReason: String,
+
+    status: {
+        type: String,
+        enum: ['Placed', 'Editing', 'Confirmed', 'Invoiced', 'Packed', 'Shipped', 'Delivered', 'Cancelled'],
+        default: 'Placed'
+    },
+    
+    previousStatus: String,
+
     items: [{
         productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
-        finalQty: Number, chargeableQty: Number, freeQty: Number, finalPrice: Number,
+        requestedQty: Number,
+        finalQty: Number,
+        chargeableQty: Number,
+        freeQty: Number,
+
+        mrp: Number,
+        expiryDate: Date,
+        offerDescription: { type: String, default: '' }, // ✨ ADDED: Immutable snapshot of the scheme
+
+        finalPrice: Number, // Unit PTR (Rate)
+        grossAmount: Number, // PTR * chargeableQty
+        
+        // Discount tracking
+        discountType: { type: String, enum: ['percent', 'amount'], default: 'percent' },
+        discountValue: { type: Number, default: 0 },
+        discountAmount: { type: Number, default: 0 },
+        
+        taxableValue: Number, // Gross - Discount
+        
+        // GST tracking
+        gstRate: { type: Number, default: 0 },
+        gstAmount: { type: Number, default: 0 },
+        
+        lineTotal: Number, // Taxable + GST
+
         plannedBatches: [{
             batchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Batch' },
-            chargeableQty: Number, freeQty: Number
+            chargeableQty: Number,
+            freeQty: Number
         }]
     }],
-    estimatedOrderTotal: Number, finalInvoiceAmount: Number,
-    invoiceDocumentId: { type: mongoose.Schema.Types.ObjectId, ref: 'SalesInvoice' },
-    invoiceNumber: String, expectedDelivery: Date,
 
-    /*
-     * Shipping/dispatch info lives on the Order, not on SalesInvoice.
-     * An order can have an invoice, but not every invoice has an order
-     * (admin can bill manually), so anything order-lifecycle-specific
-     * belongs here. Populated by orderController.shipOrder.
-     */
+    // ✨ NEW: Global bill discount tracking carried over from Inquiry/Cart
+    discountType: { type: String, enum: ['percent', 'amount'], default: 'percent' },
+    discountValue: { type: Number, default: 0 },
+    discountReason: String,
+
+    estimatedOrderTotal: Number,
+    finalInvoiceAmount: Number,
+    invoiceDocumentId: { type: mongoose.Schema.Types.ObjectId, ref: 'SalesInvoice' },
+    invoiceNumber: String,
+    invoiceBillType: { type: String, enum: ['Cash', 'Credit'] },
+    expectedDelivery: Date,
+
     dispatchDetails: {
         transportMode: String,
         vehicleNumber: String,
@@ -45,7 +76,14 @@ const orderSchema = new mongoose.Schema({
     deliveredAt: Date,
 
     billPreference: { type: String, enum: ['Cash', 'Credit'] },
+    clientNote: String,
+    adminNote: String,
+    
+    editWindowExpiresAt: Date,
+    pricingSharedAt: Date,
+
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' }
 }, { timestamps: true });
+
 module.exports = mongoose.model('Order', orderSchema);

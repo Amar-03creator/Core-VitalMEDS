@@ -1,595 +1,471 @@
-import { useState } from 'react';
-import {
-  ShoppingCart, FileText, Truck, CheckCircle2, XCircle,
-
-  ChevronDown, ChevronUp, Package, Clock, Download,
-
-  AlertTriangle, Plus, Search
-
-} from 'lucide-react';
-
-/* ── DEMO DATA ── */
-
-const orders = [
-
-  {
-
-    id: 'ORD-2024-201', clientName: 'Sharma Medical Stores', clientId: 'CUST-1042',
-
-    status: 'Placed', items: 5, amount: 12400, date: '07 May 2025',
-
-    billType: 'Credit', source: 'Inquiry',
-
-    products: [
-
-      { name: 'Paracetamol 500mg', qty: 200, price: 1800 },
-
-      { name: 'Amoxicillin 250mg', qty: 100, price: 3200 },
-
-      { name: 'Omeprazole 20mg', qty: 150, price: 4200 },
-
-    ],
-
-  },
-
-  {
-
-    id: 'ORD-2024-200', clientName: 'HealthFirst Pharmacy', clientId: 'CUST-1045',
-
-    status: 'Placed', items: 3, amount: 8750, date: '07 May 2025',
-
-    billType: 'Cash', source: 'Direct',
-
-    products: [
-
-      { name: 'Pantoprazole 40mg', qty: 120, price: 3600 },
-
-      { name: 'Atorvastatin 10mg', qty: 80, price: 2800 },
-
-    ],
-
-  },
-
-  {
-
-    id: 'ORD-2024-199', clientName: 'City Pharma', clientId: 'CUST-1043',
-
-    status: 'Invoiced', items: 4, amount: 15200, date: '06 May 2025',
-
-    billType: 'Credit', source: 'Inquiry', invoice: 'MIL-05-2025-042',
-
-    products: [],
-
-  },
-
-  {
-
-    id: 'ORD-2024-197', clientName: 'MedCare Stores', clientId: 'CUST-1046',
-
-    status: 'Shipped', items: 6, amount: 22100, date: '05 May 2025',
-
-    billType: 'Credit', source: 'Direct', invoice: 'MIL-05-2025-041',
-
-    tracking: 'Out for delivery · Est. today',
-
-    products: [],
-
-  },
-
-  {
-
-    id: 'ORD-2024-195', clientName: 'Sharma Medical Stores', clientId: 'CUST-1042',
-
-    status: 'Delivered', items: 8, amount: 34500, date: '03 May 2025',
-
-    billType: 'Credit', source: 'Direct', invoice: 'MIL-05-2025-038',
-
-    products: [],
-
-  },
-
-  {
-
-    id: 'ORD-2024-193', clientName: 'Ravi Drug House', clientId: 'CUST-1044',
-
-    status: 'Cancelled', items: 2, amount: 5200, date: '02 May 2025',
-
-    billType: 'Credit', source: 'Direct',
-
-    cancelReason: 'Customer cancelled – price mismatch',
-
-    products: [],
-
-  },
-
-];
-
-const statusConfig = {
-
-  Placed: { color: 'bg-blue-100 text-blue-700', dot: 'bg-blue-500', icon: Clock },
-
-  Confirmed: { color: 'bg-violet-100 text-violet-700', dot: 'bg-violet-500', icon: CheckCircle2 },
-
-  Invoiced: { color: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500', icon: FileText },
-
-  Shipped: { color: 'bg-cyan-100 text-cyan-700', dot: 'bg-cyan-500', icon: Truck },
-
-  Delivered: { color: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500', icon: CheckCircle2 },
-
-  Cancelled: { color: 'bg-slate-100 text-slate-600', dot: 'bg-slate-400', icon: XCircle },
-
-};
-
-const tabs = [
-
-  { key: 'Pending', label: 'Pending', statuses: ['Placed', 'Confirmed'] },
-
-  { key: 'Invoiced', label: 'Invoiced', statuses: ['Invoiced'] },
-
-  { key: 'Shipped', label: 'Shipped', statuses: ['Shipped'] },
-
-  { key: 'Delivered', label: 'Delivered', statuses: ['Delivered'] },
-
-  { key: 'Cancelled', label: 'Cancelled', statuses: ['Cancelled'] },
-
-  { key: 'All', label: 'All', statuses: Object.keys(statusConfig) },
-
-];
-
-/* ── INVOICE MODAL ── */
-
-const InvoiceModal = ({ order, onClose }) => {
-
-  const [invoiceNumber] = useState(`MIL-05-2025-${Math.floor(Math.random() * 10 + 43)}`);
-
-  const [confirmed, setConfirmed] = useState(false);
-
-  return (
-
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-end">
-
-      <div className="w-full bg-white rounded-t-2xl max-h-[85vh] overflow-y-auto">
-
-        <div className="sticky top-0 bg-white px-4 pt-4 pb-3 border-b border-slate-100 flex items-center justify-between">
-
-          <div>
-
-            <h3 className="text-slate-900 font-bold text-base">Generate Invoice</h3>
-
-            <p className="text-slate-500 text-xs">{order.id} · {order.clientName}</p>
-
-          </div>
-
-          <button onClick={onClose}><XCircle size={22} className="text-slate-400" /></button>
-
-        </div>
-
-        <div className="px-4 py-4 space-y-4">
-
-          <div className="bg-slate-50 rounded-xl p-3 space-y-2">
-
-            <div className="flex justify-between text-sm">
-
-              <span className="text-slate-500">Invoice No.</span>
-
-              <span className="text-slate-900 font-bold">{invoiceNumber}</span>
-
-            </div>
-
-            <div className="flex justify-between text-sm">
-
-              <span className="text-slate-500">Bill Type</span>
-
-              <span className={`font-semibold ${order.billType === 'Cash' ? 'text-emerald-600' : 'text-blue-600'}`}>{order.billType}</span>
-
-            </div>
-
-            <div className="flex justify-between text-sm">
-
-              <span className="text-slate-500">Items</span>
-
-              <span className="text-slate-800 font-medium">{order.items}</span>
-
-            </div>
-
-            <div className="flex justify-between text-sm font-bold">
-
-              <span className="text-slate-800">Net Amount</span>
-
-              <span className="text-slate-900">₹{order.amount.toLocaleString()}</span>
-
-            </div>
-
-          </div>
-
-          <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 flex gap-2">
-
-            <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
-
-            <p className="text-amber-700 text-xs">Confirming this will deduct stock via FIFO logic and notify the client.</p>
-
-          </div>
-
-          {confirmed ? (
-
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-4 text-center">
-
-              <CheckCircle2 size={32} className="text-emerald-500 mx-auto mb-2" />
-
-              <p className="text-emerald-800 font-bold">Invoice Generated!</p>
-
-              <p className="text-emerald-600 text-sm">{invoiceNumber}</p>
-
-            </div>
-
-          ) : (
-
-            <button
-
-              onClick={() => setConfirmed(true)}
-
-              className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2"
-
-            >
-
-              <FileText size={16} /> Confirm & Generate Invoice
-
-            </button>
-
-          )}
-
-        </div>
-
-      </div>
-
-    </div>
-
+// src/pages/Admin/OrdersPage.jsx
+
+import { useState, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
+import { ShoppingBag, Search, Loader2, Plus, ClipboardList, Package } from 'lucide-react';
+import { api } from '../../services/api';
+import { MakeInvoiceModal } from '../../modals/MakeInvoiceModal';
+
+// Utils
+import { ORDER_PENDING_STATUSES, ORDER_COMPLETED_STATUSES, INQUIRY_PENDING_STATUSES, INQUIRY_COMPLETED_STATUSES, resolveDateRange } from '../../features/Admin/OrdersPage/utils';
+
+// Components
+import OrderFilterBar from '../../features/Admin/OrdersPage/components/OrderFilterBar';
+import OrderCard from '../../features/Admin/OrdersPage/components/OrderCard';
+import OrdersTable from '../../features/Admin/OrdersPage/components/OrdersTable';
+import InquiryCard from '../../features/Admin/OrdersPage/components/InquiryCard';
+import InquiriesTable from '../../features/Admin/OrdersPage/components/InquiriesTable';
+
+// Modals
+import ShipModal from '../../features/Admin/OrdersPage/modals/ShipModal';
+import OrderReasonModal from '../../features/Admin/OrdersPage/modals/OrderReasonModal';
+import OrderDetailModal from '../../features/Admin/OrdersPage/modals/OrderDetailModal';
+import InquiryReadOnlyModal from '../../features/Admin/OrdersPage/modals/InquiryReadOnlyModal';
+import QuoteBuilderModal from '../../features/Admin/OrdersPage/modals/QuoteBuilderModal';
+
+export default function OrdersPage() {
+  // ✨ FIX: Initialize states from sessionStorage to survive reloads
+  const [activeTab, setActiveTab] = useState(() => sessionStorage.getItem('adminOrdersActiveTab') || 'orders');
+  const [busyId, setBusyId] = useState(null);
+
+  /* ── Orders tab state ─────────────────────────────────────────────── */
+  const [orderGroup, setOrderGroup] = useState(() => sessionStorage.getItem('adminOrderGroup') || 'pending');
+  const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  const [filters, setFilters] = useState({ search: '', sortBy: 'newest', dateRange: { preset: 'all' } });
+  const [debouncedFilters, setDebouncedFilters] = useState(filters);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [shipModalOrder, setShipModalOrder] = useState(null);
+  const [reasonModal, setReasonModal] = useState(null);
+  const [invoiceModalState, setInvoiceModalState] = useState(null);
+
+  /* ── Inquiries tab state ──────────────────────────────────────────── */
+  const [inquiryGroup, setInquiryGroup] = useState(() => sessionStorage.getItem('adminInquiryGroup') || 'pending');
+  const [inquiries, setInquiries] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
+  const [inquiriesLoading, setInquiriesLoading] = useState(true);
+  const [inquirySearch, setInquirySearch] = useState('');
+  const [viewInquiry, setViewInquiry] = useState(null);
+  const [quoteInquiry, setQuoteInquiry] = useState(null);
+
+  // ✨ FIX: Continuously sync tabs to sessionStorage whenever they change
+  useEffect(() => { sessionStorage.setItem('adminOrdersActiveTab', activeTab); }, [activeTab]);
+  useEffect(() => { sessionStorage.setItem('adminOrderGroup', orderGroup); }, [orderGroup]);
+  useEffect(() => { sessionStorage.setItem('adminInquiryGroup', inquiryGroup); }, [inquiryGroup]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedFilters(filters), 400);
+    return () => clearTimeout(t);
+  }, [filters]);
+
+  const fetchOrders = useCallback(async () => {
+    try {
+      const { dateFrom, dateTo } = resolveDateRange(debouncedFilters.dateRange);
+      const res = await api.getOrders({
+        search: debouncedFilters.search || undefined,
+        sortBy: debouncedFilters.sortBy,
+        dateFrom, dateTo,
+      });
+      setOrders(res.data || []);
+    } catch (err) {
+      toast.error(err.message || 'Failed to load orders');
+    } finally {
+      setOrdersLoading(false);
+    }
+  }, [debouncedFilters]);
+
+  const fetchInquiries = useCallback(async () => {
+    try {
+      const res = await api.getInquiries();
+      setInquiries(res.data || []);
+    } catch (err) {
+      toast.error(err.message || 'Failed to load inquiries');
+    } finally {
+      setInquiriesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+  useEffect(() => {
+    fetchInquiries();
+    api.getProductsWithBatches().then((res) => setAllProducts(res.data || [])).catch(() => { });
+  }, [fetchInquiries]);
+
+  const visibleOrders = orders.filter((o) =>
+    orderGroup === 'pending' ? ORDER_PENDING_STATUSES.includes(o.status) : ORDER_COMPLETED_STATUSES.includes(o.status)
   );
-
-};
-
-/* ── ORDER CARD ── */
-
-const OrderCard = ({ order }) => {
-
-  const [expanded, setExpanded] = useState(false);
-
-  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
-
-  const { color: statusColor, icon: StatusIcon } = statusConfig[order.status];
-
-  return (
-
-    <>
-
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-
-        <button onClick={() => setExpanded(e => !e)} className="w-full text-left px-4 py-3.5">
-
-          <div className="flex items-start justify-between gap-2">
-
-            <div className="flex-1 min-w-0">
-
-              <div className="flex items-center gap-2">
-
-                <span className="text-slate-400 text-xs font-mono">{order.id}</span>
-
-                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusColor}`}>
-
-                  {order.status}
-
-                </span>
-
-              </div>
-
-              <p className="text-slate-900 font-semibold text-sm mt-0.5">{order.clientName}</p>
-
-              <div className="flex items-center gap-3 mt-1">
-
-                <span className="text-slate-500 text-xs">{order.items} items</span>
-
-                <span className="text-slate-700 text-sm font-bold">₹{order.amount.toLocaleString()}</span>
-
-                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${order.billType === 'Cash' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
-
-                  }`}>{order.billType}</span>
-
-              </div>
-
-              <p className="text-slate-400 text-xs mt-1">{order.date}</p>
-
-            </div>
-
-            {expanded ? <ChevronUp size={18} className="text-slate-400 shrink-0 mt-1" /> : <ChevronDown size={18} className="text-slate-400 shrink-0 mt-1" />}
-
-          </div>
-
-        </button>
-
-        {expanded && (
-
-          <div className="border-t border-slate-100 px-4 py-4 space-y-3">
-
-            {/* Details */}
-
-            <div className="grid grid-cols-2 gap-2">
-
-              <div className="bg-slate-50 rounded-xl p-2.5">
-
-                <p className="text-slate-400 text-[10px] uppercase font-semibold">Source</p>
-
-                <p className="text-slate-800 text-sm font-medium">{order.source} Order</p>
-
-              </div>
-
-              <div className="bg-slate-50 rounded-xl p-2.5">
-
-                <p className="text-slate-400 text-[10px] uppercase font-semibold">Date</p>
-
-                <p className="text-slate-800 text-sm font-medium">{order.date}</p>
-
-              </div>
-
-              {order.invoice && (
-
-                <div className="bg-slate-50 rounded-xl p-2.5 col-span-2">
-
-                  <p className="text-slate-400 text-[10px] uppercase font-semibold">Invoice</p>
-
-                  <p className="text-slate-800 text-sm font-medium font-mono">{order.invoice}</p>
-
-                </div>
-
-              )}
-
-            </div>
-
-            {/* Shipping info */}
-
-            {order.tracking && (
-
-              <div className="bg-cyan-50 border border-cyan-200 rounded-xl px-3 py-2.5 flex items-center gap-2">
-
-                <Truck size={14} className="text-cyan-600" />
-
-                <p className="text-cyan-700 text-sm">{order.tracking}</p>
-
-              </div>
-
-            )}
-
-            {/* Cancel reason */}
-
-            {order.cancelReason && (
-
-              <div className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5">
-
-                <p className="text-xs text-slate-500 font-semibold mb-1">Cancellation Reason</p>
-
-                <p className="text-slate-700 text-sm">{order.cancelReason}</p>
-
-              </div>
-
-            )}
-
-            {/* Actions */}
-
-            <div className="flex gap-2">
-
-              {(order.status === 'Placed' || order.status === 'Confirmed') && (
-
-                <button
-
-                  onClick={() => setShowInvoiceModal(true)}
-
-                  className="flex-1 bg-emerald-500 text-white font-semibold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5"
-
-                >
-
-                  <FileText size={13} /> Generate Invoice
-
-                </button>
-
-              )}
-
-              {(order.status === 'Invoiced' || order.status === 'Shipped') && (
-
-                <button className="flex-1 bg-cyan-600 text-white font-semibold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5">
-
-                  <Truck size={13} /> Mark Shipped
-
-                </button>
-
-              )}
-
-              {order.status === 'Shipped' && (
-
-                <button className="flex-1 bg-emerald-500 text-white font-semibold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5">
-
-                  <CheckCircle2 size={13} /> Confirm Delivery
-
-                </button>
-
-              )}
-
-              {(order.status === 'Invoiced' || order.status === 'Delivered') && (
-
-                <button className="w-10 h-10 flex items-center justify-center bg-slate-100 text-slate-600 rounded-xl">
-
-                  <Download size={14} />
-
-                </button>
-
-              )}
-
-              {(order.status === 'Placed' || order.status === 'Confirmed') && (
-
-                <button className="w-10 h-10 flex items-center justify-center bg-red-50 text-red-500 rounded-xl">
-
-                  <XCircle size={14} />
-
-                </button>
-
-              )}
-
-            </div>
-
-          </div>
-
-        )}
-
-      </div>
-
-      {showInvoiceModal && <InvoiceModal order={order} onClose={() => setShowInvoiceModal(false)} />}
-
-    </>
-
-  );
-
-};
-
-/* ── PAGE ── */
-
-const OrdersPage = () => {
-
-  const [activeTab, setActiveTab] = useState('Pending');
-
-  const [search, setSearch] = useState('');
-
-  const currentStatuses = tabs.find(t => t.key === activeTab)?.statuses || [];
-
-  const filtered = orders.filter(o => {
-
-    const matchTab = currentStatuses.includes(o.status);
-
-    const matchSearch = o.clientName.toLowerCase().includes(search.toLowerCase()) ||
-
-      o.id.toLowerCase().includes(search.toLowerCase());
-
-    return matchTab && matchSearch;
-
-  });
-
-  const getCounts = (tab) => {
-
-    const statuses = tabs.find(t => t.key === tab)?.statuses || [];
-
-    return orders.filter(o => statuses.includes(o.status)).length;
-
+  if (orderGroup === 'pending') {
+    visibleOrders.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  }
+
+  const visibleInquiries = inquiries
+    .filter((i) => (inquiryGroup === 'pending' ? INQUIRY_PENDING_STATUSES.includes(i.status) : INQUIRY_COMPLETED_STATUSES.includes(i.status)))
+    .filter((i) => !inquirySearch.trim() || i.inquiryId?.toLowerCase().includes(inquirySearch.trim().toLowerCase()) || i.clientId?.establishmentName?.toLowerCase().includes(inquirySearch.trim().toLowerCase()));
+
+  if (inquiryGroup === 'pending') {
+    visibleInquiries.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  }
+
+  const pendingInquiriesCount = inquiries.filter(i => INQUIRY_PENDING_STATUSES.includes(i.status)).length;
+  const pendingOrdersCount = orders.filter(o => ORDER_PENDING_STATUSES.includes(o.status)).length;
+
+  /* ── Orders tab handlers ──────────────────────────────────────────── */
+
+  const refreshAndSync = async (orderId) => {
+    await fetchOrders();
+    if (selectedOrder && orderId === selectedOrder._id) {
+      try {
+        const freshRes = await api.getOrderById(orderId);
+        setSelectedOrder(freshRes.data);
+      } catch (err) {
+        console.error("Failed to sync populated order data", err);
+      }
+    }
+  };
+
+  const handleDownload = async (order, openForPrint = false) => {
+    setBusyId(order._id);
+    try {
+      const blob = await api.downloadOrderInvoice(order._id);
+      const url = URL.createObjectURL(blob);
+      if (openForPrint) {
+        window.open(url, '_blank');
+      } else {
+        const a = document.createElement('a');
+        a.href = url; a.download = `${order.invoiceNumber || order.orderId}.pdf`;
+        document.body.appendChild(a); a.click(); a.remove();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    } catch (err) {
+      toast.error(err.message || 'Failed to open invoice');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleAction = async (action, orderOrId) => {
+    switch (action) {
+      case 'refresh': {
+        await refreshAndSync(orderOrId);
+        return;
+      }
+      case 'confirmAndInvoice': {
+        setBusyId(orderOrId._id);
+        try {
+          await api.confirmOrder(orderOrId._id);
+          const freshRes = await api.getOrderById(orderOrId._id);
+          setSelectedOrder(freshRes.data);
+          fetchOrders();
+        } catch (err) {
+          toast.error(err.message || 'Could not confirm order');
+        } finally {
+          setBusyId(null);
+        }
+        return;
+      }
+      case 'invoice':
+        setInvoiceModalState({ order: orderOrId });
+        return;
+
+      case 'pack': {
+        setBusyId(orderOrId._id);
+        try {
+          await api.packOrder(orderOrId._id);
+          toast.success('Order marked as packed');
+          await refreshAndSync(orderOrId._id);
+        } catch (err) {
+          toast.error(err.message || 'Could not mark packed');
+        } finally {
+          setBusyId(null);
+        }
+        return;
+      }
+
+      case 'ship':
+        setShipModalOrder(orderOrId);
+        return;
+
+      case 'deliver': {
+        setBusyId(orderOrId._id);
+        try {
+          await api.confirmOrderDelivery(orderOrId._id);
+          toast.success('Order marked delivered');
+          await refreshAndSync(orderOrId._id);
+        } catch (err) {
+          toast.error(err.message || 'Could not mark delivered');
+        } finally {
+          setBusyId(null);
+        }
+        return;
+      }
+
+      case 'sharePricing': {
+        setBusyId(orderOrId._id);
+        try {
+          await api.sharePricing(orderOrId._id);
+          toast.success('Pricing shared with client');
+          await refreshAndSync(orderOrId._id);
+        } catch (err) {
+          toast.error(err.message || 'Could not share pricing');
+        } finally {
+          setBusyId(null);
+        }
+        return;
+      }
+
+      case 'cancelOrder':
+        setReasonModal({ kind: 'cancelOrder', order: orderOrId });
+        return;
+
+      case 'download':
+        return handleDownload(orderOrId, false);
+      case 'print':
+        return handleDownload(orderOrId, true);
+      default:
+        return;
+    }
+  };
+
+  const handleReasonConfirm = async (reason) => {
+    const { order } = reasonModal;
+    setBusyId(order._id);
+    try {
+      await api.cancelOrder(order._id, reason, 'admin');
+      toast.success('Order cancelled successfully');
+      setReasonModal(null);
+      setSelectedOrder(null); // ✨ FIX 1: Closes the Order Details modal instantly!
+      await refreshAndSync(order._id);
+    } catch (err) {
+      toast.error(err.message || 'Action failed');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleShipConfirm = async (dispatchDetails) => {
+    const order = shipModalOrder;
+    setBusyId(order._id);
+    try {
+      await api.shipOrder(order._id, dispatchDetails);
+      toast.success('Order marked shipped');
+      setShipModalOrder(null);
+      await refreshAndSync(order._id);
+    } catch (err) {
+      toast.error(err.message || 'Could not mark shipped');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleRejectQuote = async (inquiryId, reason) => {
+    setBusyId(inquiryId);
+    try {
+      await api.rejectInquiryQuote(inquiryId, reason);
+      toast.success('Inquiry rejected');
+      setQuoteInquiry(null);
+      fetchInquiries();
+    } catch (err) {
+      toast.error(err.message || 'Failed to reject inquiry');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  /* ── Inquiries tab handlers ───────────────────────────────────────── */
+  const openInquiry = async (inquiry) => {
+    if (inquiry.status === 'Pending') {
+      try {
+        await api.markInquiryViewed(inquiry._id);
+        fetchInquiries();
+      } catch (err) {
+        toast.error(err.message || 'Failed to mark inquiry as viewed');
+      }
+    }
+    if (['Pending', 'Viewed'].includes(inquiry.status)) {
+      setQuoteInquiry(inquiry);
+    } else {
+      setViewInquiry(inquiry);
+    }
+  };
+
+  const handleSendQuote = async (payload) => {
+    setBusyId(quoteInquiry._id);
+    try {
+      await api.sendInquiryQuote(quoteInquiry._id, payload);
+      toast.success('Quote sent to client');
+      setQuoteInquiry(null);
+      fetchInquiries();
+    } catch (err) {
+      toast.error(err.message || 'Failed to send quote');
+    } finally {
+      setBusyId(null);
+    }
   };
 
   return (
+    <div className="px-4 py-6 space-y-4 max-w-6xl mx-auto">
 
-    <div className="px-4 py-4 space-y-4 max-w-2xl mx-auto">
-
-      {/* Header */}
-
-      <div className="flex items-center justify-between">
-
+      {/* 1. TOP HEADER ROW */}
+      <div className="flex items-start justify-between gap-3">
         <div>
-
-          <h1 className="text-slate-900 text-lg font-bold">Orders</h1>
-
-          <p className="text-slate-500 text-xs">{orders.length} total orders</p>
-
+          <h1 className="text-slate-900 text-2xl sm:text-3xl md:text-4xl font-black tracking-tight leading-none mt-1">Orders & Inquiries</h1>
+          <p className="text-slate-500 text-sm sm:text-base md:text-lg font-medium mt-1.5">Process orders, manage invoices, and quote client inquiries.</p>
         </div>
 
-        <button className="flex items-center gap-1.5 bg-slate-900 text-white text-xs font-semibold px-3 py-2 rounded-xl">
-
-          <Plus size={14} /> Phone-in
-
+        <button
+          onClick={() => setInvoiceModalState({ phoneIn: true })}
+          className="shrink-0 flex items-center justify-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm md:text-base px-3 py-2 sm:px-4 sm:py-2.5 md:px-5 md:py-3 rounded-xl shadow-md transition-colors"
+        >
+          <Plus size={18} />
+          <span className="hidden sm:inline">Create Order</span>
+          <span className="sm:hidden">New</span>
         </button>
-
       </div>
 
-      {/* Search */}
-
-      <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2.5">
-
-        <Search size={15} className="text-slate-400 shrink-0" />
-
-        <input
-
-          value={search}
-
-          onChange={e => setSearch(e.target.value)}
-
-          placeholder="Search orders..."
-
-          className="flex-1 text-sm text-slate-700 placeholder-slate-400 bg-transparent outline-none"
-
-        />
-
+      {/* 2. THE TABS ROW */}
+      <div className="flex bg-slate-100 rounded-2xl p-1.5 gap-1.5 max-w-sm w-full">
+        <button onClick={() => setActiveTab('orders')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2 px-2 rounded-xl text-lg md:text-base font-bold transition-all ${activeTab === 'orders' ? 'bg-white text-slate-900 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}>
+          <ShoppingBag size={18} /> Orders
+          {pendingOrdersCount > 0 && (
+            <span className="ml-1 bg-red-500 text-white text-sm px-2 py-0.5 rounded-full shadow-sm">
+              {pendingOrdersCount}
+            </span>
+          )}
+        </button>
+        <button onClick={() => setActiveTab('inquiries')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2 px-2 rounded-xl text-lg md:text-base font-bold transition-all ${activeTab === 'inquiries' ? 'bg-white text-slate-900 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}>
+          <ClipboardList size={18} /> Inquiries
+          {pendingInquiriesCount > 0 && (
+            <span className="ml-1 bg-red-500 text-white text-sm px-2 py-0.5 rounded-full shadow-sm">
+              {pendingInquiriesCount}
+            </span>
+          )}
+        </button>
       </div>
 
-      {/* Tabs */}
+      {activeTab === 'orders' ? (
+        <div className="space-y-4">
+          <OrderFilterBar
+            group={orderGroup}
+            setGroup={setOrderGroup}
+            filters={filters}
+            setFilters={setFilters}
+            pendingOrdersCount={pendingOrdersCount}
+          />
 
-      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-
-        {tabs.map(({ key, label }) => {
-
-          const count = getCounts(key);
-
-          return (
-
-            <button
-
-              key={key}
-
-              onClick={() => setActiveTab(key)}
-
-              className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all
-
-${activeTab === key ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200'}`}
-
-            >
-
-              {label}
-
-              {count > 0 && (
-
-                <span className={`text-[10px] font-bold px-1 rounded-full ${activeTab === key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
-
-                  {count}
-
-                </span>
-
+          {ordersLoading ? (
+            <div className="flex items-center justify-center py-20 text-slate-400 gap-3 bg-white rounded-2xl border border-slate-200 shadow-sm">
+              <Loader2 size={24} className="animate-spin" /> <span className="text-base font-bold">Loading orders...</span>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {visibleOrders.length === 0 && (
+                <div className="text-center py-16 text-slate-400 bg-white rounded-2xl border border-dashed border-slate-300">
+                  <Package className="mx-auto mb-3 text-slate-300" size={40} />
+                  <p className="text-lg font-bold text-slate-500">No {orderGroup} orders found.</p>
+                </div>
               )}
-
+              {visibleOrders.map((order) => (
+                <OrderCard key={order._id} order={order} onOpen={setSelectedOrder} />
+              ))}
+              <OrdersTable orders={visibleOrders} onOpen={setSelectedOrder} />
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex border-b border-slate-200 mb-2">
+            <button onClick={() => setInquiryGroup('pending')}
+              className={`px-6 py-3.5 text-base md:text-base font-bold border-b-2 transition-colors -mb-[1px] ${inquiryGroup === 'pending' ? 'text-slate-900 border-slate-900' : 'text-slate-500 border-transparent hover:text-slate-700'}`}>
+              Pending
             </button>
-
-          );
-
-        })}
-
-      </div>
-
-      {/* Orders list */}
-
-      <div className="space-y-3">
-
-        {filtered.length === 0 ? (
-
-          <div className="text-center py-12 text-slate-400">
-
-            <ShoppingCart className="mx-auto mb-2" size={32} />
-
-            <p className="text-sm">No orders here</p>
-
+            <button onClick={() => setInquiryGroup('completed')}
+              className={`px-6 py-3.5 text-base md:text-base font-bold border-b-2 transition-colors -mb-[1px] ${inquiryGroup === 'completed' ? 'text-slate-900 border-slate-900' : 'text-slate-500 border-transparent hover:text-slate-700'}`}>
+              Completed
+            </button>
           </div>
 
-        ) : (
+          <div className="relative max-w-sm mb-7">
+            <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input value={inquirySearch} onChange={(e) => setInquirySearch(e.target.value)} placeholder="Search Inquiry ID or client..."
+              className="w-full pl-10 pr-4 py-2 text-base md:text-base bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900/10 shadow-sm" />
+          </div>
 
-          filtered.map(o => <OrderCard key={o.id} order={o} />)
+          {inquiriesLoading ? (
+            <div className="flex items-center justify-center py-20 text-slate-400 gap-3 bg-white rounded-2xl border border-slate-200 shadow-sm">
+              <Loader2 size={24} className="animate-spin" /> <span className="text-base font-bold">Loading inquiries...</span>
+            </div>
+          ) : (
+            <div className="space-y-7">
+              {visibleInquiries.length === 0 && (
+                <div className="text-center py-16 text-slate-400 bg-white rounded-2xl border border-dashed border-slate-300">
+                  <ClipboardList className="mx-auto mb-3 text-slate-300" size={40} />
+                  <p className="text-lg font-bold text-slate-500">No {inquiryGroup} inquiries found.</p>
+                </div>
+              )}
+              {visibleInquiries.map((inquiry) => (
+                <InquiryCard key={inquiry._id} inquiry={inquiry} onOpen={openInquiry} />
+              ))}
+              <InquiriesTable inquiries={visibleInquiries} onOpen={openInquiry} />
+            </div>
+          )}
+        </div>
+      )}
 
-        )}
+      {selectedOrder && (
+        <OrderDetailModal
+          order={selectedOrder}
+          busy={busyId === selectedOrder._id}
+          onClose={() => setSelectedOrder(null)}
+          onAction={handleAction}
+        />
+      )}
+      {shipModalOrder && (
+        <ShipModal order={shipModalOrder} busy={busyId === shipModalOrder._id}
+          onClose={() => setShipModalOrder(null)} onConfirm={handleShipConfirm} />
+      )}
+      {reasonModal && (
+        <OrderReasonModal
+          title={`Cancel order ${reasonModal.order.orderId}?`}
+          message={
+            ['Invoiced', 'Packed'].includes(reasonModal.order.status)
+              ? 'This order has an active invoice. Cancelling will automatically void the invoice and restore the stock to your inventory.'
+              : undefined
+          }
+          actionLabel="Confirm Cancel"
+          busy={busyId === reasonModal.order._id}
+          onClose={() => setReasonModal(null)}
+          onConfirm={handleReasonConfirm}
+        />
+      )}
+      {invoiceModalState && (
+        <MakeInvoiceModal
+          prefillOrder={invoiceModalState.order || null}
+          phoneIn={!!invoiceModalState.phoneIn}
+          onClose={() => setInvoiceModalState(null)}
+          onOrderUpdated={(updatedOrder) => {
+            if (updatedOrder?.status === 'Cancelled') {
+              setSelectedOrder(null);
+              refreshAndSync(null);
+            } else {
+              refreshAndSync(updatedOrder._id);
+            }
+          }}
+        />
+      )}
 
-      </div>
-
+      {viewInquiry && <InquiryReadOnlyModal inquiry={viewInquiry} onClose={() => setViewInquiry(null)} />}
+      {quoteInquiry && (
+        <QuoteBuilderModal
+          inquiry={quoteInquiry}
+          allProducts={allProducts}
+          busy={busyId === quoteInquiry._id}
+          onClose={() => setQuoteInquiry(null)}
+          onSent={handleSendQuote}
+          onReject={handleRejectQuote}
+        />
+      )}
     </div>
-
   );
-
-};
-
-export default OrdersPage;
+}

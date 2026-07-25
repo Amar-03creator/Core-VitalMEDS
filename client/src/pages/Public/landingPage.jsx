@@ -76,10 +76,10 @@ const steps = [
 ];
 
 const tiers = [
-  { name: 'Silver',   threshold: 'Up to ₹50K/mo',   perks: ['Standard pricing', 'Net-30 credit', 'Email support'], color: 'border-slate-300 bg-slate-50', badge: 'bg-gray-100 text-gray-600' },
-  { name: 'Gold',     threshold: '₹50K – ₹1L/mo',   perks: ['5% better pricing', 'Net-45 credit', 'Priority support'], color: 'border-amber-300 bg-amber-50', badge: 'bg-amber-100 text-amber-700' },
-  { name: 'Platinum', threshold: '₹1L – ₹2L/mo',    perks: ['8% better pricing', 'Net-60 credit', 'Dedicated manager'], color: 'border-slate-400 bg-slate-100', badge: 'bg-slate-200 text-slate-700' },
-  { name: 'Diamond',  threshold: '₹2L+/mo',          perks: ['Best rates + free goods', 'Flexible credit', 'Same-day dispatch'], color: 'border-cyan-300 bg-cyan-50', badge: 'bg-cyan-100 text-cyan-700', highlight: true },
+  { name: 'Silver', threshold: 'Up to ₹50K/mo', perks: ['Standard pricing', 'Net-30 credit', 'Email support'], color: 'border-slate-300 bg-slate-50', badge: 'bg-gray-100 text-gray-600' },
+  { name: 'Gold', threshold: '₹50K – ₹1L/mo', perks: ['5% better pricing', 'Net-45 credit', 'Priority support'], color: 'border-amber-300 bg-amber-50', badge: 'bg-amber-100 text-amber-700' },
+  { name: 'Platinum', threshold: '₹1L – ₹2L/mo', perks: ['8% better pricing', 'Net-60 credit', 'Dedicated manager'], color: 'border-slate-400 bg-slate-100', badge: 'bg-slate-200 text-slate-700' },
+  { name: 'Diamond', threshold: '₹2L+/mo', perks: ['Best rates + free goods', 'Flexible credit', 'Same-day dispatch'], color: 'border-cyan-300 bg-cyan-50', badge: 'bg-cyan-100 text-cyan-700', highlight: true },
 ];
 
 const companies = ['Cipla', 'Sun Pharma', "Dr. Reddy's", 'Mankind', 'Torrent', 'USV', 'Alkem', 'Aster', 'Sanofi', 'Macleods'];
@@ -126,7 +126,7 @@ const LandingPage = () => {
           <svg className="absolute inset-0 w-full h-full opacity-[0.03]" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
-                <path d="M 32 0 L 0 0 0 32" fill="none" stroke="white" strokeWidth="0.5"/>
+                <path d="M 32 0 L 0 0 0 32" fill="none" stroke="white" strokeWidth="0.5" />
               </pattern>
             </defs>
             <rect width="100%" height="100%" fill="url(#grid)" />
@@ -161,6 +161,22 @@ const LandingPage = () => {
               className="flex items-center justify-center gap-2 bg-white/10 text-white font-semibold py-3.5 px-6 rounded-2xl text-base border border-white/20 hover:bg-white/15 transition-all">
               Sign In
             </Link>
+          </div>
+
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-sm mt-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-white text-lg font-bold flex items-center gap-2">
+                  <Star size={18} className="text-amber-400 fill-amber-400" /> Existing Partner?
+                </h3>
+                <p className="text-slate-400 text-sm mt-1">
+                  Have we billed you offline before? Claim your digital account instantly using your Admin Code.
+                </p>
+              </div>
+              <Link to="/claim-account" className="shrink-0 bg-slate-800 text-white border border-slate-700 font-bold py-2.5 px-5 rounded-xl text-sm hover:bg-slate-700 transition-all text-center">
+                Claim Account
+              </Link>
+            </div>
           </div>
 
           {/* Trust line */}

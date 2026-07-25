@@ -1,0 +1,24 @@
+service: vitalmeds-api
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ap-south-1 # This is the Mumbai region.
+  stage: production
+  memorySize: 256
+  timeout: 15
+  httpApi:
+    cors: true
+  # 👇 This is how AWS Lambda gets your environment variables!
+  environment:
+    MONGO_URI: paste-your-mongodb-atlas-url-here
+    COGNITO_USER_POOL_ID: ap-south-1_t7cmqYdPT
+    COGNITO_CLIENT_ID: 2gomoic0dpgtimj3dg8tfjqceu
+
+functions:
+  api:
+    handler: server.handler
+    events:
+      - httpApi:
+          path: '/{proxy+}'
+          method: '*'

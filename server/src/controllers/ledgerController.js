@@ -93,7 +93,11 @@ exports.getLedger = async (req, res) => {
     const clientIds = clients.map(c => c._id);
 
     const [invoices, receipts] = await Promise.all([
-      SalesInvoice.find({ clientObjectId: { $in: clientIds } })
+      // ✨ FIXED: Added invoiceStatus: { $ne: 'CANCELLED' } to the ledger query
+      SalesInvoice.find({ 
+        clientObjectId: { $in: clientIds },
+        invoiceStatus: { $ne: 'CANCELLED' } 
+      })
         .select('clientObjectId invoiceDate invoiceNumber billType totalPayable')
         .lean(),
       PaymentReceipt.find({ clientObjectId: { $in: clientIds } })

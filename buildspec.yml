@@ -1,0 +1,29 @@
+version: 0.2
+
+env:
+  variables:
+    # Hum API URL ko AWS Console se inject karenge
+    VITE_API_BASE_URL: ""
+    S3_BUCKET_NAME: ""
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+    commands:
+      - echo "Installing frontend dependencies..."
+      - cd client
+      - npm install
+  build:
+    commands:
+      - echo "Building the React app for production..."
+      # Create .env file dynamically so Vite knows the live API URL
+      - echo "VITE_API_BASE_URL=$VITE_API_BASE_URL" > .env
+      - echo "VITE_COGNITO_USER_POOL_ID=$VITE_COGNITO_USER_POOL_ID" >> .env
+      - echo "VITE_COGNITO_CLIENT_ID=$VITE_COGNITO_CLIENT_ID" >> .env
+      - npm run build
+  post_build:
+    commands:
+      - echo "Uploading new files to S3 and removing old ones..."
+      # The --delete flag ensures old cached files are removed
+      - aws s3 sync dist/ s3://$S3_BUCKET_NAME --delete

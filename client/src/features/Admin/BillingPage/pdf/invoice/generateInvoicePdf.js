@@ -1,4 +1,4 @@
-// generateInvoicePdf.js
+// client/src/features/Admin/BillingPage/pdf/invoice/generateInvoicePdf.js
 
 import { jsPDF } from 'jspdf';
 import { CONTENT, CONTENT_PAD } from './pdfGeometry';

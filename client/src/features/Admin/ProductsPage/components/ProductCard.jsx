@@ -1,3 +1,4 @@
+// client/src/features/Admin/ProductsPage/components/ProductCard.jsx
 import { useState } from 'react';
 import { BaseProductCard } from '../../../../components/BaseProductCard'; // <-- Make sure path is correct!
 

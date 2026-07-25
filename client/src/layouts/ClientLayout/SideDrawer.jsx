@@ -1,7 +1,6 @@
-// src/layouts/ClientLayout/SideDrawer.jsx
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { UserCircle2, FileText, BookOpen, MessageSquare, LogOut, ChevronRight, TrendingUp } from 'lucide-react';
+import { UserCircle2, FileText, BookOpen, MessageSquare, LogOut, ChevronRight, TrendingUp, Sparkles } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useBackHandler } from '../../hooks/useBackHandler';
 
@@ -15,6 +14,12 @@ const tierColors = {
 // Intentionally excludes Home / Products / Order Now / Reorder / My Orders —
 // those already live on the bottom nav.
 const navGroups = [
+  {
+    group: 'Promotions',
+    items: [
+      { to: '/client-dashboard/offers', label: 'Special Schemes & Offers', icon: Sparkles },
+    ],
+  },
   {
     group: 'Account',
     items: [
