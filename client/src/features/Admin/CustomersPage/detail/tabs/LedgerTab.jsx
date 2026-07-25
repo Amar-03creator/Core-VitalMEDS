@@ -3,9 +3,9 @@ import { useState, useCallback } from 'react';
 import { FileSpreadsheet } from 'lucide-react';
 import { api } from '../../../../../services/api';
 import { LedgerTable } from '@/components/ledgers/LedgerTable';
-import { WhatsAppReminder } from '@/components/ledgers/WhatsAppReminder';
-import { LedgerActions } from '@/components/ledgers/LedgerActions';
-import { downloadLedgerPDF, printLedgerPDF } from '@/components/ledgers/ledgerPDF';
+import { WhatsAppReminder } from '../../../../../components/ledgers/WhatsappReminder';
+import { LedgerActions } from '../../../../../components/ledgers/LedgerActions';
+import { downloadLedgerPDF, printLedgerPDF } from '../../../../../components/ledgers/ledgerPDF';
 
 const todayStr      = () => new Date().toISOString().split('T')[0];
 const monthStartStr = () => { const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0]; };

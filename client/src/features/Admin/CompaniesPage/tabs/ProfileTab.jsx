@@ -3,9 +3,9 @@ import { Edit2, Save, X as XIcon, Plus, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../../../../services/api';
 import { validateField } from '../../../../modals/AddCompanyModal/validation';
-import { RepCard } from '../components/RepCard';
-import { BankDetailCard } from '../components/BankDetailCard';
-import { StatusToggle } from '../components/StatusToggle';
+import { RepCard } from '../components/Repcard';
+import { BankDetailCard } from '../components/Bankdetailcard';
+import { StatusToggle } from '../components/Statustoggle';
 
 const emptyBank = { bankName: '', accountNumber: '', ifscCode: '', branch: '' };
 const emptyRep = { name: '', role: '', phone: '', email: '' };

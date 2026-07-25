@@ -2,8 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { Plus } from 'lucide-react';
 import { api } from '../../../services/api';
 import { toast } from 'sonner';
-import { CompanySearchBar } from './components/CompanySearchBar';
-import { CompanyListItem } from './components/CompanyListItem';
+import { CompanySearchBar } from './components/Companysearchbar';
+import { CompanyListItem } from './components/Companylistitem';
 import { AddCompanyModal } from '../../../modals/AddCompanyModal';
 
 export const CompaniesListView = ({ onSelectCompany }) => {

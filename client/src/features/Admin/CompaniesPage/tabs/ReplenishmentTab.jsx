@@ -3,7 +3,7 @@ import { Zap, RefreshCw, Download, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../../../../services/api';
 import { REPLENISH_STRATEGIES } from '../utils/constants';
-import { ReplenishmentRow } from '../components/ReplenishmentRow';
+import { ReplenishmentRow } from '../components/Replenishmentrow';
 import { downloadPurchaseOrderPDF } from '../utils/generatePurchaseOrderPdf';
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

@@ -6,9 +6,9 @@ import { toast } from 'sonner';
 import { Spinner } from '@/components/ui/spinner';
 import { LedgerFilterPanel } from '../modals/LedgerFilterPanel';
 import { downloadLedgerPDF, printLedgerPDF } from '@/components/ledgers/ledgerPDF';
-import { WhatsAppReminder } from '@/components/ledgers/WhatsAppReminder';
-import { LedgerTable } from '@/components/ledgers/LedgerTable';
-import { LedgerActions } from '@/components/ledgers/LedgerActions';
+import { WhatsAppReminder } from '../../../../../src/components/ledgers/WhatsappReminder';
+import { LedgerTable } from '../../../../../src/components/ledgers/LedgerTable';
+import { LedgerActions } from '../../../../../src/components/ledgers/LedgerActions';
 
 const STORAGE_KEY = 'ledgersTabState';
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { api } from '../../../../services/api';
 import { toast } from 'sonner';
-import { DebitNoteCard } from '../components/DebitNoteCard';
+import { DebitNoteCard } from '../components/Debitnotecard';
 import { ReturnToCompanyModal } from '../modals/ReturnToCompanyModal';
 
 export const DebitNotesTab = ({ company, onCompanyUpdated }) => {
