@@ -96,4 +96,6 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // ✨ CLOUD ADDITION: Export the wrapped app for AWS Lambda
-module.exports.handler = serverless(app);
+module.exports.handler = serverless(app, {
+  binary: ['application/pdf', '*/*']
+});
