@@ -180,9 +180,27 @@ export const orderApi = {
     return res.json();
   },
 
+  // async downloadOrderInvoice(orderId) {
+  //   const res = await secureFetch(`/orders/${orderId}/invoice/pdf`);
+  //   if (!res.ok) throw new Error('Failed to download invoice');
+  //   return res.blob();
+  // },
   async downloadOrderInvoice(orderId) {
     const res = await secureFetch(`/orders/${orderId}/invoice/pdf`);
     if (!res.ok) throw new Error('Failed to download invoice');
-    return res.blob();
+
+    // ✨ RESPONSE KO JSON MEIN READ KAREIN
+    const data = await res.json();
+
+    // ✨ BASE64 KO WAPAS PURE BINARY (BLOB) MEIN CONVERT KAREIN
+    const byteCharacters = atob(data.pdfData);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+
+    return new Blob([byteArray], { type: 'application/pdf' });
   },
+
 };
