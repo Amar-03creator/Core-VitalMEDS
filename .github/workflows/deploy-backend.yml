@@ -1,0 +1,44 @@
+name: Deploy Backend to AWS Lambda
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'server/**'
+      - '.github/workflows/deploy-backend.yml'
+
+# ✨ Mandatory for OIDC Security
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # ✨ AWS Secret-less OIDC Login
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ap-south-1
+
+      - name: Install Dependencies
+        run: |
+          cd server
+          npm ci
+
+      - name: Deploy Serverless Backend
+        run: |
+          cd server
+          npx serverless@3 deploy --stage prod
