@@ -66,7 +66,7 @@ export const SearchableSelect = ({ value, onChange, options, onSelect, onClear, 
           onFocus={handleFocus}
           onBlur={handleBlur}
           placeholder={placeholder}
-          className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-base text-slate-800 outline-none focus:border-emerald-400"
+          className="w-full bg-white border border-slate-300 rounded-xl pl-2 pr-8 py-2.5 text-base text-slate-800 outline-none focus:border-emerald-400"
         />
         {value && (
           <button onClick={handleClear} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">

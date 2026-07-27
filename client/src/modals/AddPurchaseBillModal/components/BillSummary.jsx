@@ -1,3 +1,4 @@
+// AddPurchaseBillModal/components/BillSummary.jsx
 import { useMemo } from 'react';
 
 export const BillSummary = ({ items, purchaseType, billDiscountValue, billDiscountType }) => {
@@ -30,7 +31,10 @@ export const BillSummary = ({ items, purchaseType, billDiscountValue, billDiscou
         const sgst = taxable * sgstRate / 100;
         totalCGST += cgst;
         totalSGST += sgst;
-        const rateKey = `CGST+SGST ${(cgstRate + sgstRate).toFixed(1)}%`;
+        
+        // ✨ FIX: Modified the key format to match your exact request
+        const rateKey = `CGST+SGST (${cgstRate}% + ${sgstRate}%)`;
+        
         if (!slabMap[rateKey]) slabMap[rateKey] = { taxable: 0, cgst: 0, sgst: 0 };
         slabMap[rateKey].taxable += taxable;
         slabMap[rateKey].cgst += cgst;
@@ -38,7 +42,7 @@ export const BillSummary = ({ items, purchaseType, billDiscountValue, billDiscou
       } else {
         const igst = taxable * igstRate / 100;
         totalIGST += igst;
-        const rateKey = `IGST ${igstRate.toFixed(1)}%`;
+        const rateKey = `IGST ${igstRate}%`;
         if (!slabMap[rateKey]) slabMap[rateKey] = { taxable: 0, igst: 0 };
         slabMap[rateKey].taxable += taxable;
         slabMap[rateKey].igst = (slabMap[rateKey].igst || 0) + igst;
@@ -81,9 +85,10 @@ export const BillSummary = ({ items, purchaseType, billDiscountValue, billDiscou
           <div key={key} className="flex justify-between text-sm text-slate-500 pl-4">
             <span>{key}</span>
             <span>
+              {/* ✨ FIX: Rendered the separated + format */}
               {purchaseType === 'intrastate'
-                ? `CGST ₹${val.cgst.toFixed(2)}  SGST ₹${val.sgst.toFixed(2)}`
-                : `IGST ₹${val.igst.toFixed(2)}`}
+                ? `₹${val.cgst.toFixed(2)} + ₹${val.sgst.toFixed(2)}`
+                : `₹${val.igst.toFixed(2)}`}
             </span>
           </div>
         ))}

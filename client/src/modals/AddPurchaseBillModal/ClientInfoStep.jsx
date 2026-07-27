@@ -1,3 +1,4 @@
+// AddPurchaseBillModal/ClientInfoStep.jsx
 import { useState, useMemo, useEffect } from 'react';
 import { Lock } from 'lucide-react';
 import { SearchableSelect } from './SearchableSelect';
@@ -34,17 +35,21 @@ export const ClientInfoStep = ({
   const [billDateTouched, setBillDateTouched] = useState(false);
   const [receivedDateTouched, setReceivedDateTouched] = useState(false);
 
+  const handleFocus = (e) => {
+    const target = e.target;
+    setTimeout(() => {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 300); 
+  };
+
   useEffect(() => {
     if (!lockedSupplierId || supplierId) return;
-    
-    // ★ FIX: Safely check against both _id and id
     const company = companies.find(c => (c._id || c.id) === lockedSupplierId);
     if (company) {
       setSupplierId(company._id || company.id);
       setSupplierSearch(company.companyName);
       setAddress(company.billingAddress || '');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lockedSupplierId, companies]);
 
   const supplierOptions = useMemo(() => {
@@ -52,20 +57,16 @@ export const ClientInfoStep = ({
     const s = supplierSearch.toLowerCase();
     return companies
       .filter(c => c.companyName.toLowerCase().includes(s))
-      // ★ FIX: Ensure the dropdown option uses the MongoDB _id if present
       .map(c => ({ id: c._id || c.id, label: c.companyName, billingAddress: c.billingAddress }));
   }, [supplierSearch, companies]);
 
   const handleSelectSupplier = (item) => {
-    // ★ FIX: Match the selected item ID against both _id and id
     const company = companies.find(c => (c._id || c.id) === item.id);
-    
     if (company) {
       setSupplierId(company._id || company.id);
       setSupplierSearch(company.companyName);
       setAddress(company.billingAddress || '');
     }
-    
     setShowSupplierList(false);
     supplierField.unlock();
   };
@@ -92,22 +93,23 @@ export const ClientInfoStep = ({
   const canNext = supplierId && invoiceNo.trim() && billDate && receivedDate;
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 space-y-5">
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-base font-semibold text-slate-700">Supplier *</label>
-              {!lockedSupplierId && (
-                <button type="button" onClick={() => setShowAddCompany(true)} className="text-sm font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-lg hover:bg-slate-200">+ New</button>
-              )}
+    // ✨ FIX: Removed pb-32 to fix the excessive padding issue
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-base font-semibold text-slate-700">Supplier *</label>
+            {!lockedSupplierId && (
+              <button type="button" onClick={() => setShowAddCompany(true)} className="text-sm font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-lg hover:bg-slate-200">+ New</button>
+            )}
+          </div>
+          {lockedSupplierId ? (
+            <div className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2.5 text-base text-slate-700 flex items-center gap-2">
+              <Lock size={14} className="text-slate-400 shrink-0" />
+              <span className="truncate">{supplierSearch || '...'}</span>
             </div>
-            {lockedSupplierId ? (
-              <div className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2.5 text-base text-slate-700 flex items-center gap-2">
-                <Lock size={14} className="text-slate-400 shrink-0" />
-                <span className="truncate">{supplierSearch || '...'}</span>
-              </div>
-            ) : (
+          ) : (
+            <div onFocusCapture={handleFocus} className="w-full [&_input]:w-full [&_input]:bg-white [&_input]:border [&_input]:border-slate-300 [&_input]:rounded-xl [&_input]:px-3 [&_input]:py-2.5 [&_input]:text-base [&_input]:text-slate-800 [&_input]:outline-none [&_input]:focus:border-emerald-400">
               <SearchableSelect
                 value={supplierSearch}
                 onChange={val => setSupplierSearch(val)}
@@ -118,27 +120,32 @@ export const ClientInfoStep = ({
                 show={showSupplierList}
                 setShow={setShowSupplierList}
               />
-            )}
-          </div>
-          <div>
-            <label className="text-base font-semibold text-slate-700 block mb-1">Invoice No. *</label>
-            <input
-              ref={invoiceField.ref}
-              value={invoiceNo}
-              onChange={e => setInvoiceNo(e.target.value)}
-              onBlur={invoiceField.onBlur}
-              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-base text-slate-800 outline-none focus:border-emerald-400"
-            />
-          </div>
+            </div>
+          )}
         </div>
+        <div>
+          <label className="text-base font-semibold text-slate-700 block mb-1">Invoice No. *</label>
+          <input
+            ref={invoiceField.ref}
+            value={invoiceNo}
+            onChange={e => setInvoiceNo(e.target.value)}
+            onFocus={handleFocus}
+            onBlur={invoiceField.onBlur}
+            className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-base text-slate-800 outline-none focus:border-emerald-400"
+          />
+        </div>
+      </div>
 
-        <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div onFocusCapture={handleFocus}>
           <DateInput
             value={billDate}
             onChange={(val) => { setBillDate(val); setBillDateTouched(true); }}
             label="Bill Date *"
             validate={validateBillDate}
           />
+        </div>
+        <div onFocusCapture={handleFocus}>
           <DateInput
             value={receivedDate}
             onChange={(val) => { setReceivedDate(val); setReceivedDateTouched(true); }}
@@ -146,41 +153,42 @@ export const ClientInfoStep = ({
             validate={validateReceivedDate}
           />
         </div>
+      </div>
 
+      <div>
+        <label className="text-base font-semibold text-slate-700 block mb-1">Address</label>
+        <textarea
+          value={address}
+          readOnly
+          rows={2}
+          onFocus={handleFocus}
+          className="w-full bg-slate-100 border border-slate-300 rounded-xl px-3 py-2.5 text-base text-slate-800 outline-none resize-none cursor-not-allowed"
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-base font-semibold text-slate-700 block mb-1">Address</label>
-          <textarea
-            value={address}
-            readOnly
-            rows={2}
-            className="w-full bg-slate-100 border border-slate-300 rounded-xl px-3 py-2.5 text-base text-slate-800 outline-none resize-none cursor-not-allowed"
-          />
+          <label className="text-base font-semibold text-slate-700 block mb-1">Bill Type</label>
+          <select onFocus={handleFocus} value={billType} onChange={e => setBillType(e.target.value)} className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-base text-slate-800 outline-none focus:border-emerald-400">
+            <option>Credit</option>
+            <option>Cash</option>
+            <option>Stock Transfer</option>
+          </select>
         </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-base font-semibold text-slate-700 block mb-1">Bill Type</label>
-            <select value={billType} onChange={e => setBillType(e.target.value)} className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-base text-slate-800 outline-none focus:border-emerald-400">
-              <option>Credit</option>
-              <option>Cash</option>
-              <option>Stock Transfer</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-base font-semibold text-slate-700 block mb-1">Purchase Type</label>
-            <select value={purchaseType} onChange={e => setPurchaseType(e.target.value)} className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-base text-slate-800 outline-none focus:border-emerald-400">
-              <option value="intrastate">Intra‑state</option>
-              <option value="interstate">Interstate</option>
-            </select>
-          </div>
+        <div>
+          <label className="text-base font-semibold text-slate-700 block mb-1">Purchase Type</label>
+          <select onFocus={handleFocus} value={purchaseType} onChange={e => setPurchaseType(e.target.value)} className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-base text-slate-800 outline-none focus:border-emerald-400">
+            <option value="intrastate">Intra-state</option>
+            <option value="interstate">Interstate</option>
+          </select>
         </div>
       </div>
 
-      <div className="mt-auto pt-4 border-t border-slate-100">
+      <div className="pt-5 mt-4 border-t border-slate-100">
         <button
           onClick={onNext}
           disabled={!canNext}
-          className="w-full bg-slate-900 text-white font-bold py-3.5 rounded-xl text-lg disabled:opacity-50 hover:bg-slate-800"
+          className="w-full bg-slate-900 text-white font-bold py-3.5 rounded-xl text-lg disabled:opacity-50 hover:bg-slate-800 transition-colors"
         >
           Next: Products Entry →
         </button>

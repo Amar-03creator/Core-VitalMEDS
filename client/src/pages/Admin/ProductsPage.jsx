@@ -273,41 +273,36 @@ const ProductsPage = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-slate-900 text-2xl font-black tracking-tight">Catalog</h1>
-          <p className="text-slate-500 text-xs font-medium">Master Product Directory</p>
+          <h1 className="text-slate-900 text-3xl font-black tracking-tight">Catalog</h1>
+          <p className="text-slate-500 text-base font-medium">Master Product Directory</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-1">
           <button onClick={() => openExportModal('print')} className="p-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl shadow-sm hover:bg-slate-50">
-            <Printer size={18} />
+            <Printer size={20} />
           </button>
           <button onClick={() => openExportModal('download')} className="p-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl shadow-sm hover:bg-slate-50">
-            <Download size={18} />
+            <Download size={20} />
           </button>
-          <button onClick={() => { setEditProduct(null); setIsAddModalOpen(true); }} className="flex items-center gap-1.5 bg-slate-900 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-sm hover:bg-slate-800">
-            <Plus size={16} /> Add
+          <button onClick={() => { setEditProduct(null); setIsAddModalOpen(true); }} className="flex items-center gap-1.5 bg-slate-900 text-white text-base font-bold px-4 py-2.5 rounded-xl shadow-sm hover:bg-slate-800">
+            Add Product
           </button>
         </div>
       </div>
 
-      {/* KPI Stats */}
-      <div className="grid grid-cols-4 gap-2">
-        <div className="rounded-2xl p-3 border bg-white border-slate-200 text-center shadow-sm">
-          <p className="text-xl font-black text-slate-800">{stats.total}</p>
-          <p className="text-[10px] font-bold text-slate-400 uppercase">Products</p>
-        </div>
-        <div className="rounded-2xl p-3 border bg-amber-50 border-amber-200 text-center">
-          <p className="text-xl font-black text-amber-700">{stats.lowStock}</p>
-          <p className="text-[10px] font-bold text-amber-600 uppercase">Low Stock</p>
-        </div>
-        <div className="rounded-2xl p-3 border bg-red-50 border-red-200 text-center">
-          <p className="text-xl font-black text-red-700">{stats.outStock}</p>
-          <p className="text-[10px] font-bold text-red-600 uppercase">Out</p>
-        </div>
-        <div className="rounded-2xl p-3 border bg-blue-50 border-blue-200 text-center">
-          <p className="text-xl font-black text-blue-700">{stats.categories}</p>
-          <p className="text-[10px] font-bold text-blue-600 uppercase">Categories</p>
-        </div>
-      </div>
+     {/* KPI Stats */}
+<div className="grid grid-cols-2 gap-2">
+  {[
+    { label: 'Products', value: stats.total, bg: 'bg-white', text: 'text-slate-800', labelText: 'text-slate-400', border: 'border-slate-200' },
+    { label: 'Low Stock', value: stats.lowStock, bg: 'bg-amber-50', text: 'text-amber-700', labelText: 'text-amber-400', border: 'border-amber-200' },
+    { label: 'Out', value: stats.outStock, bg: 'bg-red-50', text: 'text-red-700', labelText: 'text-red-400', border: 'border-red-200' },
+    { label: 'Categories', value: stats.categories, bg: 'bg-blue-50', text: 'text-blue-700', labelText: 'text-blue-400', border: 'border-blue-200' },
+  ].map(({ label, value, bg, text, labelText, border }) => (
+    <div key={label} className={`rounded-2xl p-3 border ${bg} ${border} text-center shadow-sm`}>
+      <p className={`text-xl font-black ${text}`}>{value}</p>
+      <p className={`text-sm font-bold ${labelText} uppercase tracking-tight`}>{label}</p>
+    </div>
+  ))}
+</div>
 
       {/* Search & Filter Bar */}
       <div className="flex gap-2">

@@ -15,9 +15,14 @@ export const expiryToDate = (expiryStr) => {
   return `${parts[1]}-${month}-${String(lastDay).padStart(2, '0')}`;
 };
 
+// ✨ FIX: Safely parse YYYY-MM into MM/YYYY without hitting undefined!
 export const formatDate = (dateStr) => {
   if (!dateStr) return '';
-  const [y, m, d] = dateStr.split('-');
+  const parts = dateStr.split('-');
+  if (parts.length === 2) {
+      return `${parts[1]}/${parts[0]}`; // It's a YYYY-MM string
+  }
+  const [y, m, d] = parts;
   return `${d}/${m}/${y}`;
 };
 
@@ -57,7 +62,7 @@ export const useProductItems = ({ products, items, setItems, purchaseType, billD
       packing: p.packing,
       hsn:     p.hsnCode || p.hsn,
       gstRate: p.gstRate,
-      name:    p.name, // Used to set the input value cleanly
+      name:    p.name,
     }));
   }, [productSearch, products]);
 
@@ -103,7 +108,6 @@ export const useProductItems = ({ products, items, setItems, purchaseType, billD
           }));
         }
       } catch {
-        // silent
       } finally {
         if (!cancelled) setRatesLoading(false);
       }
@@ -141,7 +145,6 @@ export const useProductItems = ({ products, items, setItems, purchaseType, billD
       productId: item.id,
       hsn:       item.hsn || '',
     }));
-    // FIX: Only set the product name in the input field, stripping the (HSN) tag.
     setProductSearch(item.name);
     setShowProductList(false);
   };
@@ -152,7 +155,6 @@ export const useProductItems = ({ products, items, setItems, purchaseType, billD
     setShowProductList(false);
   };
 
-  // ★ UPDATED: Backspace logic clears the form
   const handleBatchChange = (val) => {
     const valUpper = val.toUpperCase();
     
@@ -171,21 +173,13 @@ export const useProductItems = ({ products, items, setItems, purchaseType, billD
         }
         newState.expiryDate = exp;
 
-        if (exactMatch.mrp) {
-          newState.mrp = String(exactMatch.mrp);
-        }
-        if (exactMatch.sellingRate) {
-          newState.ptr = String(exactMatch.sellingRate);
-        } else if (exactMatch.mrp) {
-          newState.ptr = String((exactMatch.mrp * 0.8).toFixed(2));
-        }
-        if (exactMatch.purchaseRate !== undefined) {
-          newState.purchaseRate = String(exactMatch.purchaseRate);
-        }
+        if (exactMatch.mrp) newState.mrp = String(exactMatch.mrp);
+        if (exactMatch.sellingRate) newState.ptr = String(exactMatch.sellingRate);
+        else if (exactMatch.mrp) newState.ptr = String((exactMatch.mrp * 0.8).toFixed(2));
+        
+        if (exactMatch.purchaseRate !== undefined) newState.purchaseRate = String(exactMatch.purchaseRate);
         
       } else {
-        // FIX: If it was locked, and the user hits backspace (breaking the match),
-        // we clear the fields so they can enter a new manual batch.
         if (prev.isBatchLocked) {
           newState.expiryDate = '';
           newState.mrp = '';
@@ -194,14 +188,12 @@ export const useProductItems = ({ products, items, setItems, purchaseType, billD
         }
         newState.isBatchLocked = false;
       }
-
       return newState;
     });
   };
 
   const handleEditItem = (item) => {
     setEditingItemId(item.id);
-    
     const product = products?.find(p => (p._id || p.id) === item.productId);
     const batches = product?.batches || [];
     const exactMatch = batches.find(b => 
@@ -245,6 +237,19 @@ export const useProductItems = ({ products, items, setItems, purchaseType, billD
     if (billDate && currentItem.expiryDate && currentItem.expiryDate <= billDate) {
       toast.error('Expiry date must be after bill date'); return;
     }
+
+    // ✨ FIX: Strict Duplicate Blocking
+    const isDuplicate = items.some(it => 
+      it.productId === currentItem.productId && 
+      (it.batchNumber || '').toUpperCase() === (currentItem.batchNumber || '').toUpperCase() && 
+      it.id !== editingItemId
+    );
+
+    if (isDuplicate) {
+      toast.error(`Batch ${currentItem.batchNumber} is already added. Please edit the existing item instead.`);
+      return;
+    }
+
     const product = products?.find(p => (p._id || p.id) === currentItem.productId);
     if (!product) { toast.error('Product not found'); return; }
 
@@ -263,14 +268,14 @@ export const useProductItems = ({ products, items, setItems, purchaseType, billD
 
     const itemData = {
       ...currentItem,
-      id:           editingItemId || genId(),
-      productName:  product.name,
-      packing:      product.packing,
-      hsn:          currentItem.hsn || product.hsnCode || product.hsn,
-      gstRate:      product.gstRate,
-      mrp:          mrpNum,
-      purchaseRate: rateNum,
-      ptr:          ptrNum,
+      id:            editingItemId || genId(),
+      productName:   product.name,
+      packing:       product.packing,
+      hsn:           currentItem.hsn || product.hsnCode || product.hsn,
+      gstRate:       product.gstRate,
+      mrp:           mrpNum,
+      purchaseRate:  rateNum,
+      ptr:           ptrNum,
       chargeableQty: qtyNum,
       freeQty:       parseInt(currentItem.free) || 0,
       discountValue: parseNum(currentItem.discountValue),

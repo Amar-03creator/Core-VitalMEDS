@@ -43,7 +43,7 @@ export const PurchaseEntryModal = ({
   const [receivedDate, setReceivedDate] = useState(savedState?.receivedDate ?? new Date().toISOString().split('T')[0]);
   const [address, setAddress] = useState(savedState?.address ?? '');
   const [billType, setBillType] = useState(savedState?.billType ?? 'Credit');
-  const [purchaseType, setPurchaseType] = useState(savedState?.purchaseType ?? 'intrastate');
+  const [purchaseType, setPurchaseType] = useState(savedState?.purchaseType ?? 'interstate');
   const [items, setItems] = useState(savedState?.items ?? []);
 
   const [billDiscountType, setBillDiscountType] = useState(savedState?.billDiscountType ?? 'percent');
@@ -74,13 +74,11 @@ export const PurchaseEntryModal = ({
       try {
         const currentSupplier = companies.find(c => (c._id || c.id) === supplierId);
         let res;
-
-        // ★ FIX: Use getInventory to fetch products WITH their populated batches
         if (currentSupplier?.companyName) {
           try {
             res = await api.getInventory({ company: currentSupplier.companyName });
           } catch (err) {
-            res = await api.getProductsByCompany(supplierId); // Fallback just in case
+            res = await api.getProductsByCompany(supplierId); 
           }
         } else {
           res = await api.getProductsByCompany(supplierId);
@@ -163,21 +161,24 @@ export const PurchaseEntryModal = ({
 
   return (
     <>
-      <div className="fixed inset-0 z-100 bg-black/60 flex items-end">
-        <div className="w-full bg-white rounded-t-2xl flex flex-col" style={{ height: '85dvh' }}>
-          <div className="sticky top-0 bg-white flex items-center justify-between px-5 py-4 border-b z-10">
+      <div className="fixed inset-0 z-[100] bg-black/60 flex items-end md:items-center justify-center md:p-4">
+        {/* ✨ THE FIX: Removed hardcoded 85dvh. Swapped to max-h to shrink-wrap Step 1, but scroll for Step 2! */}
+        <div className="w-full md:max-w-5xl bg-white rounded-t-3xl md:rounded-2xl flex flex-col shadow-2xl relative overflow-hidden max-h-[88vh] md:max-h-[82vh]">
+          
+          <div className="shrink-0 bg-white z-30 border-b border-slate-100 px-5 py-4 flex items-center justify-between">
             <div>
               <h3 className="font-bold text-slate-900 text-xl">Purchase Entry</h3>
               <p className="text-sm text-slate-500">
                 {step === 1 ? 'Client & Invoice Info' : 'Products & Items'}
               </p>
             </div>
-            <button onClick={() => { sessionStorage.removeItem(STORAGE_KEY); onClose(); }}>
-              <X size={24} className="text-slate-400" />
+            <button onClick={() => { sessionStorage.removeItem(STORAGE_KEY); onClose(); }} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition-colors">
+              <X size={20} className="text-slate-500" />
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-5 py-4">
+          {/* ✨ min-h-0 allows the flex child to scroll seamlessly without breaking its container */}
+          <div className="flex-1 overflow-y-auto min-h-0 px-5 py-4">
             {step === 1 ? (
               <ClientInfoStep
                 companies={companies}
@@ -214,7 +215,6 @@ export const PurchaseEntryModal = ({
                   billDate={billDate}
                   showAddProduct={showAddProduct}
                   setShowAddProduct={setShowAddProduct}
-                  onBack={() => setStep(1)}
                 />
 
                 {items.length > 0 && (
@@ -234,21 +234,19 @@ export const PurchaseEntryModal = ({
                       <button
                         type="button"
                         onClick={() => setBillDiscountType(prev => prev === 'percent' ? 'amount' : 'percent')}
-                        className="shrink-0 px-4 py-2 bg-white border border-slate-300 rounded-xl text-base font-bold w-20 hover:bg-slate-50"
+                        className="shrink-0 px-4 py-2 bg-slate-50 border border-slate-300 rounded-xl text-base font-bold w-20 hover:bg-slate-100 transition-colors"
                       >
                         {billDiscountType === 'percent' ? '%' : '₹'}
                       </button>
                     </div>
-                    <p className="text-xs text-slate-400 mt-1">
-                      {billDiscountType === 'percent'
-                        ? 'Applied on total after GST'
-                        : 'Flat amount deducted from total after GST'}
+                    <p className="text-sm text-slate-400 mt-1">
+                      {billDiscountType === 'percent' ? 'Applied on total after GST' : 'Flat amount deducted from total after GST'}
                     </p>
                   </div>
                 )}
 
                 {items.length > 0 && (
-                  <div className="mt-5">
+                  <div className="mt-5 pb-5">
                     <BillSummary
                       items={items}
                       purchaseType={purchaseType}
@@ -262,16 +260,16 @@ export const PurchaseEntryModal = ({
           </div>
 
           {step === 2 && (
-            <div className="sticky bottom-0 bg-white border-t border-slate-100 px-5 py-4 z-10">
+            <div className="shrink-0 bg-white border-t border-slate-100 px-5 py-4 z-10 shadow-[0_-4px_10px_rgba(0,0,0,0.02)]">
               <div className="flex gap-3">
                 <button onClick={() => setStep(1)}
-                  className="flex-1 bg-slate-100 text-slate-700 font-semibold py-3.5 rounded-xl text-base hover:bg-slate-200">
+                  className="flex-1 bg-slate-100 text-slate-700 font-semibold py-3.5 rounded-xl text-base hover:bg-slate-200 transition-colors">
                   <ArrowLeft size={24} className="inline-block mr-2" /> Back
                 </button>
                 <button
                   onClick={handleSave}
                   disabled={!supplierId || !invoiceNo || items.length === 0}
-                  className="flex-1 bg-emerald-500 text-white font-bold py-3.5 rounded-xl text-lg disabled:opacity-50 hover:bg-emerald-600"
+                  className="flex-[2] bg-emerald-500 text-white font-bold py-3.5 rounded-xl text-lg disabled:opacity-50 hover:bg-emerald-600 transition-colors"
                 >
                   Save Entry
                 </button>

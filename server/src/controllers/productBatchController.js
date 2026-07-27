@@ -81,7 +81,8 @@ exports.getProductsWithBatches = async (req, res) => {
           hsn: product.hsnCode,
           gstRate: product.gstRate,
           mrp: product.mrp || 0,
-          photoUrl: product.photoUrl || '',
+          photoUrl: (product.images && product.images.length > 0) ? product.images[0] : (product.photoUrl || ''),
+          images: product.images || [],
           defaultRate: computedRate,    
           batches: batchList,
           
@@ -352,7 +353,8 @@ exports.getOffersList = async (req, res) => {
         sellingRate: b.sellingRate,
         offer: b.offer?.description ? b.offer : null,
         
-        photoUrl: prod.photoUrl,
+        photoUrl: (prod.images && prod.images.length > 0) ? prod.images[0] : (prod.photoUrl || ''),
+        images: prod.images || [],
         packing: prod.packing,
         type: prod.type,
         categories: prod.categories || [],      

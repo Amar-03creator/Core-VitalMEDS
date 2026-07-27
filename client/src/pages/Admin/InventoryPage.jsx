@@ -224,30 +224,30 @@ const InventoryPage = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-slate-900 text-3xl font-black tracking-tight">Inventory</h1>
-          <p className="text-slate-500 text-md font-medium">Stock Ledger & FIFO Tracking</p>
+          <p className="text-slate-500 text-base font-medium">Stock Ledger & FIFO Tracking</p>
         </div>
         <button
           onClick={() => setIsPurchaseModalOpen(true)}
-          className="flex items-center gap-1.5 bg-slate-900 text-white text-lg font-bold px-4 py-2.5 rounded-xl shadow-sm hover:bg-slate-800 transition-colors"
+          className="flex items-center gap-1.5 bg-slate-900 text-white text-base font-bold px-4 py-2.5 rounded-xl shadow-sm hover:bg-slate-800 transition-colors"
         >
-          <Plus size={18} /> Add Bill
+          <Plus size={20} /> Add Bill
         </button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 gap-2">
-        {[
-          { label: 'Products', value: stats.total, bg: 'bg-white', text: 'text-slate-800', border: 'border-slate-200' },
-          { label: 'Low Stock', value: stats.lowStock, bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
-          { label: 'Out of Stock', value: stats.outStock, bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' },
-          { label: 'Short-Expiry', value: stats.nearExp, bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200' },
-        ].map(({ label, value, bg, text, border }) => (
-          <div key={label} className={`rounded-2xl p-3 border ${bg} ${border} text-center shadow-sm`}>
-            <p className={`text-xl font-black ${text}`}>{value}</p>
-            <p className={`text-sm font-bold ${text} uppercase tracking-tight`}>{label}</p>
-          </div>
-        ))}
-      </div>
+   {/* Stats Cards */}
+<div className="grid grid-cols-2 gap-2">
+  {[
+    { label: 'Products', value: stats.total, bg: 'bg-white', text: 'text-slate-800', labelText: 'text-slate-400', border: 'border-slate-200' },
+    { label: 'Low Stock', value: stats.lowStock, bg: 'bg-amber-50', text: 'text-amber-700', labelText: 'text-amber-400', border: 'border-amber-200' },
+    { label: 'Out of Stock', value: stats.outStock, bg: 'bg-red-50', text: 'text-red-700', labelText: 'text-red-400', border: 'border-red-200' },
+    { label: 'Short-Expiry', value: stats.nearExp, bg: 'bg-orange-50', text: 'text-orange-700', labelText: 'text-orange-400', border: 'border-orange-200' },
+  ].map(({ label, value, bg, text, labelText, border }) => (
+    <div key={label} className={`rounded-2xl p-3 border ${bg} ${border} text-center shadow-sm`}>
+      <p className={`text-xl font-black ${text}`}>{value}</p>
+      <p className={`text-sm font-bold ${labelText} uppercase tracking-tight`}>{label}</p>
+    </div>
+  ))}
+</div>
 
       {/* Search & Filter Bar */}
       <div className="space-y-3">

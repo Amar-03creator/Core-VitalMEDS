@@ -1,9 +1,13 @@
-import { Package, ChevronDown } from 'lucide-react';
+// src/components/BaseProductCard.jsx
+import { ChevronDown } from 'lucide-react';
+import ImageCarousel from './ImageCarousel';
 
 export const BaseProductCard = ({
   product,
   expanded,
   onToggle,
+  onImageZoom, 
+  isImageZoomed, 
   hasNearExpiry = false,
   hideStockInfo = false,
   children
@@ -12,6 +16,15 @@ export const BaseProductCard = ({
   const threshold = product.lowStockThreshold || 0;
   const stockStatus = totalStock === 0 ? 'out' : totalStock <= threshold ? 'low' : 'ok';
   const companyDisplay = product.companyDetails?.[0]?.shortCode || product.companyShortCode || product.company || 'N/A';
+  
+  // Extract all images
+  const rawImages = product.images?.length > 0 ? [...product.images] : [];
+  if (rawImages.length === 0 && (product.photoUrl || product.imageUrl || product.photo)) {
+    rawImages.push(product.photoUrl || product.imageUrl || product.photo);
+  }
+  const productImages = rawImages
+    .map(img => typeof img === 'object' && img !== null ? (img.secure_url || img.url) : img)
+    .filter(Boolean);
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden mb-3 shadow-sm transition-all">
@@ -21,12 +34,21 @@ export const BaseProductCard = ({
       >
         <div className="flex items-center gap-3 pr-6">
 
-          {/* ── Square image slot ── */}
-          <div className="shrink-0 m-1 w-25 h-25 relative rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shadow-sm">
-            {/* Icon centred */}
-            <Package size={28} className="text-slate-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-            {/* Company name overlay */}
-            <div className="absolute bottom-0 left-0 right-0 bg-black/80 px-1 py-0.5">
+          {/* ✨ THUMBNAIL SLOT */}
+          <div className="shrink-0 m-1 w-24 h-24 relative rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shadow-sm z-10">
+            
+            {/* ✨ FIX: We only pass productImages[0] here! This kills the carousel for the thumbnail. */}
+            <ImageCarousel 
+              images={productImages.length > 0 ? [productImages[0]] : []} 
+              alt={product.name || product.productName} 
+              rounded="rounded-none"
+              autoPlay={false} // Force auto-play off just in case
+              onImageClick={expanded && onImageZoom ? onImageZoom : undefined}
+              showZoomIcon={expanded && !!onImageZoom}
+              isZoomed={isImageZoomed}
+            />
+            
+            <div className="absolute bottom-0 left-0 right-0 bg-black/80 px-1 py-0.5 pointer-events-none">
               <p
                 className="text-[9px] font-black uppercase tracking-widest text-white text-center truncate"
                 title={companyDisplay}
@@ -55,29 +77,29 @@ export const BaseProductCard = ({
           </div>
         </div>
 
-        {/* Chevron — unchanged */}
+        {/* Chevron */}
         <div className="absolute top-0 right-0 bg-slate-50 border-b border-l border-slate-200 rounded-bl-xl p-1 flex items-center justify-center shadow-sm">
           <div className={`transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`}>
             <ChevronDown size={18} className="text-slate-400" />
           </div>
         </div>
 
-        {/* Stock badge — unchanged */}
-        {!hideStockInfo && (
-          <div className="absolute bottom-0 right-0 flex items-stretch overflow-hidden rounded-tl-xl shadow-sm border-t border-l border-slate-200 bg-white">
-            {hasNearExpiry && (
-              <span className="text-[10px] font-bold px-2.5 py-1.5 bg-orange-100 text-orange-700 flex items-center border-r border-slate-200">
-                NEAR EXPIRY
-              </span>
-            )}
-            <div className="px-3 py-1 flex items-baseline gap-1.5 bg-slate-50">
-              <span className={`font-black text-lg leading-none ${stockStatus === 'out' ? 'text-red-500' : stockStatus === 'low' ? 'text-amber-500' : 'text-emerald-600'}`}>
-                {totalStock}
-              </span>
-              <span className="text-slate-400 text-sm font-bold uppercase">items</span>
-            </div>
-          </div>
-        )}
+        {/* Stock badge */}
+{!hideStockInfo && (
+  <div className="absolute -bottom-px -right-px flex items-stretch overflow-hidden rounded-tl-xl shadow-sm border-t border-l border-slate-200 bg-white">
+    {hasNearExpiry && (
+      <span className="text-xs font-bold px-2.5 py-1 bg-orange-100 text-orange-700 flex items-center border-r border-slate-200">
+        NEAR EXPIRY
+      </span>
+    )}
+    <div className="px-3 py-1 flex items-baseline gap-1.5 bg-slate-50">
+      <span className={`font-black text-lg leading-none ${stockStatus === 'out' ? 'text-red-500' : stockStatus === 'low' ? 'text-amber-500' : 'text-emerald-600'}`}>
+        {totalStock}
+      </span>
+      <span className="text-slate-400 text-sm font-bold uppercase">items</span>
+    </div>
+  </div>
+)}
       </button>
 
       {children}
