@@ -88,6 +88,11 @@ export const productApi = {
     if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to update product');
     return res.json();
   },
+  getUploadSignature: async () => {
+    const res = await secureFetch('/products/upload-signature');
+    if (!res.ok) throw new Error('Failed to get upload signature');
+    return res.json();
+  },
 
   /* ── Products with Batches & Inventory ────────────────────────────────── */
   async getProductsWithBatches() {

@@ -16,6 +16,7 @@ import { ThresholdFields } from './ThresholdFields';
 import { DescriptionFields } from './DescriptionFields';
 import { useModalTrap, useScrollLock } from '../../hooks/useBackHandler';
 import { AddCompanyModal } from '../AddCompanyModal';
+import { ImageUploadField } from './ImageUploadField';
 
 const STORAGE_KEY = 'addProductForm';
 
@@ -26,7 +27,7 @@ export const AddProductModal = ({
   defaultCompanyId,
   defaultCompanyName,
   productToEdit,
-  disableBackTrap=false,
+  disableBackTrap = false,
 }) => {
   useScrollLock(true);
   useModalTrap(true, { disabled: disableBackTrap, onBackClose: onClose });
@@ -41,13 +42,14 @@ export const AddProductModal = ({
   };
   const saved = load();
 
-  
+
 
   const initialFormData = (() => {
     if (isEditMode) {
       return {
         name: productToEdit.name || '',
         companyId: productToEdit.companyId?._id || productToEdit.companyId || '',
+        images: productToEdit.images || [],
         companyName: productToEdit.companyDetails?.[0]?.companyName || productToEdit.company || '',
         gstInclusive: productToEdit.gstInclusive || 'inclusive',
         compositions: productToEdit.compositions?.length ? productToEdit.compositions : [''],
@@ -65,7 +67,7 @@ export const AddProductModal = ({
     if (defaultCompanyId) {
       return {
         name: '', companyId: defaultCompanyId, companyName: defaultCompanyName || '',
-        gstInclusive: 'inclusive',
+        gstInclusive: 'inclusive', images: [],
         compositions: [''], categories: [], type: '', packing: '',
         hsnCode: '', gstRate: '12', shortExpiryThreshold: '', lowStockThreshold: '',
         description: '', usageTips: '',
@@ -73,7 +75,7 @@ export const AddProductModal = ({
     }
     return saved?.formData ?? {
       name: '', companyId: '', companyName: '', gstInclusive: 'inclusive',
-      compositions: [''], categories: [], type: '', packing: '',
+      compositions: [''], categories: [], type: '', packing: '', images: [],
       hsnCode: '', gstRate: '12', shortExpiryThreshold: '', lowStockThreshold: '',
       description: '', usageTips: '',
     };
@@ -113,6 +115,7 @@ export const AddProductModal = ({
         packing: formData.packing,
         hsnCode: formData.hsnCode,
         gstRate: parseFloat(formData.gstRate) || 12,
+        images: formData.images || [],
         shortExpiryThreshold: formData.shortExpiryThreshold ? parseInt(formData.shortExpiryThreshold) : undefined,
         lowStockThreshold: formData.lowStockThreshold ? parseInt(formData.lowStockThreshold) : undefined,
         description: formData.description,
@@ -128,7 +131,7 @@ export const AddProductModal = ({
       }
 
       if (!defaultCompanyId && !isEditMode) sessionStorage.removeItem(STORAGE_KEY);
-      onSave(); 
+      onSave();
       onClose();
     } catch (err) {
       toast.error(err.message);
@@ -165,9 +168,9 @@ export const AddProductModal = ({
     if (!isEditMode) return null;
     const isChanged = JSON.stringify(formData[fieldKey]) !== JSON.stringify(originalData[fieldKey]);
     if (!isChanged) return null;
-    
+
     return (
-      <button 
+      <button
         type="button"
         onClick={() => revertField(fieldKey)}
         className="flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md hover:bg-amber-100 transition-colors"
@@ -199,7 +202,11 @@ export const AddProductModal = ({
               toast={toast} engageTrap={engageTrap} releaseTrap={releaseTrap}
               isLocked={isEditMode}
             />
+
+            {/* Image Upload Component */}
+<ImageUploadField formData={formData} setFormData={setFormData} toast={toast} />
           </div>
+          
 
           {/* Company Selection - LOCKED */}
           {isCompanyLocked ? (
@@ -224,7 +231,7 @@ export const AddProductModal = ({
             <div className="absolute right-0 -top-1"><UndoButton fieldKey="gstInclusive" label="Tax Basis" /></div>
             <GSTInclusive formData={formData} setFormData={setFormData} />
           </div>
-          
+
           {/* Compositions - LOCKED */}
           <div className="relative">
             <div className="absolute right-0 -top-1"><UndoButton fieldKey="compositions" label="Compositions" /></div>
@@ -245,7 +252,7 @@ export const AddProductModal = ({
             <div className="absolute right-0 -top-1"><UndoButton fieldKey="packing" label="Packing" /></div>
             <PackingInput formData={formData} setFormData={setFormData} toast={toast} />
           </div>
-          
+
           {/* HSN & GST - HSN LOCKED */}
           <div className="relative">
             <div className="absolute right-0 -top-1"><UndoButton fieldKey="gstRate" label="GST" /></div>
@@ -256,10 +263,10 @@ export const AddProductModal = ({
               isLocked={isEditMode}
             />
           </div>
-          
+
           <div className="relative">
-             <div className="absolute right-0 -top-1"><UndoButton fieldKey="shortExpiryThreshold" label="Thresholds" /></div>
-             <ThresholdFields formData={formData} setFormData={setFormData} />
+            <div className="absolute right-0 -top-1"><UndoButton fieldKey="shortExpiryThreshold" label="Thresholds" /></div>
+            <ThresholdFields formData={formData} setFormData={setFormData} />
           </div>
 
           <div className="relative">

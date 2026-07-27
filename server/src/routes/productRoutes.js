@@ -1,15 +1,17 @@
 const express = require('express');
-const router = express.Router(); // Hint: Capital 'R'
+const router = express.Router(); 
 
-// Import the brain you just built
 const productController = require('../controllers/productController'); 
 
+// ✨ NAYA ROUTE: Get Cloudinary upload signature (MUST BE BEFORE /:id)
+router.get('/upload-signature', productController.getUploadSignature);
+
 // Define the POST road (Create)
-router.post('/', productController.createProduct); // Hint: Method is POST, function is createProduct
+router.post('/', productController.createProduct); 
 
 // Define the GET road (Read)
-router.get('/', productController.getAllProducts); // Hint: Method is GET, function is getAllProducts
+router.get('/', productController.getAllProducts); 
 
-router.put('/:id', productController.updateProduct); // Hint: Method is PUT, function is updateProduct
+router.put('/:id', productController.updateProduct); 
 
 module.exports = router;

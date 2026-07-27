@@ -10,7 +10,10 @@ const productSchema = new mongoose.Schema({
     packing: { type: String, required: true },
     hsnCode: { type: String, required: true },
     sku: { type: String },
-    photoUrl: String,
+    images: [{ 
+        url: String, 
+        publicId: String // Cloudinary public_id (Delete karne ke kaam aayega)
+    }],
     description: String,
     usageTips: String,
     gstRate: { type: Number, required: true },
