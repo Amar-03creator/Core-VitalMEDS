@@ -27,3 +27,6 @@ phases:
       - echo "Uploading new files to S3 and removing old ones..."
       # The --delete flag ensures old cached files are removed
       - aws s3 sync dist/ s3://$S3_BUCKET_NAME --delete
+      - echo "Automatically flushing CloudFront cache..."
+      # 👇 Automatically tells CloudFront to serve the newest React code!
+      - aws cloudfront create-invalidation --distribution-id EE2B6AS2DJ6F6 --paths "/*"
