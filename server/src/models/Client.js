@@ -10,7 +10,7 @@ const clientSchema = new mongoose.Schema({
         uppercase: true,
         match: /^[0-9A-Z]{3}$/,
     },
-    businessType: { type: String, enum: ['Retail', 'Wholesale', 'Hospital', 'Clinic'], required: true },
+    businessType: { type: String, enum: ['Retail', 'Wholesale', 'Hospital / Clinic'], required: true },
     status: {
         type: String,
         enum: ['Pending', 'Active', 'Static', 'Credit Alert', 'Suspended'],
@@ -40,7 +40,7 @@ const clientSchema = new mongoose.Schema({
         email: String,
         designation: {
             type: String,
-            enum: ['Owner', 'Proprietor', 'Manager', 'Partner', 'Staff'],
+            enum: ['Owner', 'Proprietor', 'Manager', 'Partner'],
             required: true
         },
         isPrimary: { type: Boolean, default: false },
@@ -55,22 +55,32 @@ const clientSchema = new mongoose.Schema({
 
     gstin: {
         type: String,
-        required: function () {
-            return !this.aadhaarNumber;
-        },
         unique: true,
+        sparse: true, // ✨ FIX: Use sparse so empty strings don't trigger duplicate errors
         uppercase: true,
         minlength: 15,
         maxlength: 15
     },
-    panNumber: String,
+    panNumber: {
+        type: String,
+        trim: true,
+        uppercase: true
+    },
     aadhaarNumber: {
         type: String,
         minlength: 12,
         maxlength: 12
     },
-    drugLicense20B: String,
-    drugLicense21B: String,
+
+    // ✨ NEW: Dynamic Array for Drug Licenses (Replaces 20B/21B)
+    drugLicenses: [{
+        type: String,
+        trim: true,
+        uppercase: true
+    }],
+
+    documentsUploaded: { type: Boolean, default: false },
+
 
     documentsVerified: { type: Boolean, default: false },
     documentUrls: {
@@ -109,14 +119,14 @@ const clientSchema = new mongoose.Schema({
         status: { type: String, enum: ['pending', 'approved', 'rejected', 'completed', 'dismissed'], default: 'pending' },
         requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
         requestedAt: { type: Date, default: Date.now },
-        
+
         approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
         approvedAt: Date,
-        
+
         resolvedAt: Date, // When swept up or dismissed
         resolvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
         resolutionReason: { type: String, enum: ['dismissed', 'client_approved', 'uploaded'] },
-        
+
         rejectionNote: String,
         completedAt: Date,
         newFileKey: String,
@@ -148,7 +158,7 @@ const clientSchema = new mongoose.Schema({
     isClaimed: {
         type: Boolean,
         default: false
-    }, 
+    },
 
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' }

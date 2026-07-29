@@ -1,9 +1,11 @@
 // server/src/controllers/authController.js
 const Client = require('../models/Client');
+const Admin = require('../models/Admin'); // ✨ NEW
+const Notification = require('../models/Notification'); // ✨ NEW
 const { getNextClientCode } = require('../helpers/SequenceHelper');
 const AWS = require('aws-sdk');
 
-/* ── MASKING HELPERS ── */
+/* ── MASKING & FORMATTING HELPERS ── */
 const maskEmail = (email) => {
   if (!email) return null;
   const [name, domain] = email.split('@');
@@ -17,16 +19,16 @@ const maskPhone = (phone) => {
   return `+91 ******${cleaned.slice(-4)}`;
 };
 
-/* ── 1. STANDARD REGISTRATION ── */
-exports.registerClient = async (req, res) => {
-  try {
-    const {
-      establishmentName, ownerName, designation, businessType,
-      email, phone, password,
-      billingAddress, shippingAddress, city, district, pincode,
-      gstin, drugLicense20B, drugLicense21B, aadhaar, pan
-    } = req.body;
+// ✨ FIX: Helper to sanitize phone numbers before saving to MongoDB
+const strip91 = (num) => (num ? num.replace(/^\+91/, '').replace(/\D/g, '') : undefined);
 
+
+/* ── 1. REGISTRATION: STEP A (Send OTP) ── */
+exports.registerInit = async (req, res) => {
+  try {
+    const { email, phone, password } = req.body;
+
+    // Check if email/phone exists in MongoDB first
     const existingClient = await Client.findOne({
       $or: [{ 'contacts.email': email }, { 'contacts.phone': phone }]
     });
@@ -36,67 +38,157 @@ exports.registerClient = async (req, res) => {
     }
 
     const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
+    
+    const cognito = new AWS.CognitoIdentityServiceProvider({ region: process.env.AWS_REGION });
 
-    const cognito = new AWS.CognitoIdentityServiceProvider({
-      region: process.env.AWS_REGION || 'ap-south-1'
-    });
-
-    await cognito.adminCreateUser({
-      UserPoolId: process.env.COGNITO_USER_POOL_ID,
-      Username: email,
-      UserAttributes: [
-        { Name: 'email', Value: email },
-        { Name: 'email_verified', Value: 'true' },
-        { Name: 'phone_number', Value: formattedPhone },
-        { Name: 'phone_number_verified', Value: 'true' }
-      ],
-      MessageAction: 'SUPPRESS' 
-    }).promise();
-
-    await cognito.adminSetUserPassword({
-      UserPoolId: process.env.COGNITO_USER_POOL_ID,
+    // Use native signUp to trigger AWS Cognito's automated OTP to email/phone
+    await cognito.signUp({
+      ClientId: process.env.COGNITO_CLIENT_ID, // Use ClientId, NOT UserPoolId here
       Username: email,
       Password: password,
-      Permanent: true
+      UserAttributes: [
+        { Name: 'email', Value: email },
+        { Name: 'phone_number', Value: formattedPhone }
+      ]
     }).promise();
 
+    res.status(200).json({ success: true, message: 'OTP sent successfully. Please check your email.' });
+  } catch (error) {
+    console.error('Register Init Error:', error);
+    
+    // ✨ FIX: Handle the Unconfirmed User Deadlock
+    if (error.code === 'UsernameExistsException') {
+      try {
+        const cognito = new AWS.CognitoIdentityServiceProvider({ region: process.env.AWS_REGION });
+        await cognito.resendConfirmationCode({
+          ClientId: process.env.COGNITO_CLIENT_ID,
+          Username: email
+        }).promise();
+        return res.status(200).json({ success: true, message: 'OTP resent to existing unconfirmed account.' });
+      } catch (resendError) {
+        return res.status(400).json({ message: 'An account with this email is already fully registered. Please log in.' });
+      }
+    }
+    
+    res.status(500).json({ message: error.message || 'Failed to initiate registration.' });
+  }
+};
+
+/* ── 1. REGISTRATION: STEP B (Verify OTP & Create Record) ── */
+/* ── 1. REGISTRATION: STEP B (Verify OTP & Create Record) ── */
+exports.registerVerify = async (req, res) => {
+  const {
+    otp, establishmentName, ownerName, designation, businessType,
+    email, phone, billingAddress, shippingAddress, city, district, pincode,
+    gstin, aadhaar, pan,
+    drugLicenses // ✨ NEW: Expect the array
+  } = req.body;
+
+  const cognito = new AWS.CognitoIdentityServiceProvider({ region: process.env.AWS_REGION || 'ap-south-1' });
+
+  // ==========================================
+  // PHASE 1: Verify OTP with AWS Cognito
+  // ==========================================
+  try {
+    // 1. Verify the OTP
+    await cognito.confirmSignUp({
+      ClientId: process.env.COGNITO_CLIENT_ID,
+      Username: email,
+      ConfirmationCode: otp
+    }).promise();
+
+    // 2. Add to Client group
     await cognito.adminAddUserToGroup({
       UserPoolId: process.env.COGNITO_USER_POOL_ID,
       Username: email,
       GroupName: 'client'
     }).promise();
+    
+  } catch (cognitoError) {
+    console.error('Cognito Verify Error:', cognitoError);
+    if (cognitoError.code === 'CodeMismatchException' || cognitoError.code === 'ExpiredCodeException') {
+      return res.status(400).json({ message: 'Invalid or expired OTP.' });
+    }
+    return res.status(500).json({ message: cognitoError.message || 'Server Error during OTP verification.' });
+  }
 
+  // ==========================================
+  // PHASE 2: Save to MongoDB with Auto-Rollback
+  // ==========================================
+  try {
     const uniqueId = await getNextClientCode();
+
+    // ✨ Filter out any empty drug licenses just to be safe
+    const cleanDrugLicenses = Array.isArray(drugLicenses) 
+        ? drugLicenses.filter(lic => lic && lic.trim() !== '') 
+        : [];
 
     const newClient = new Client({
       establishmentName,
       clientId: uniqueId,
       businessType,
       status: 'Pending',
+      documentsUploaded: false,
       billingAddress,
       shippingAddress: shippingAddress || billingAddress, 
       city, district, pincode,
       gstin: gstin || undefined,
-      drugLicense20B, drugLicense21B,
       panNumber: pan || undefined,
       aadhaarNumber: aadhaar || undefined,
+      drugLicenses: cleanDrugLicenses, // ✨ NEW: Save the array
       contacts: [{
         name: ownerName,
         designation: designation,
         email: email,
-        phone: phone,
+        phone: strip91(phone), // ✨ FIX: Sanitize before saving
         isPrimary: true
       }]
     });
 
     await newClient.save();
-    res.status(201).json({ success: true, message: 'Registration complete' });
 
-  } catch (error) {
-    console.error('Registration Error:', error);
-    res.status(500).json({ message: error.message || 'Server Error during registration' });
+    await notifyAllAdmins({
+      type: 'registration',
+      title: 'New Client Registration',
+      message: `${establishmentName} has registered and is pending KYC document upload/approval.`,
+      link: `/admin-dashboard/customers/${newClient._id}`
+    });
+    
+    return res.status(201).json({ success: true, message: 'Registration complete! You can now log in.' });
+
+  } catch (dbError) {
+    console.error('Database save failed during registration:', dbError);
+
+    // 🚨 THE ROLLBACK: MongoDB failed, so delete the user from Cognito
+    try {
+      await cognito.adminDeleteUser({
+        UserPoolId: process.env.COGNITO_USER_POOL_ID,
+        Username: email
+      }).promise();
+      console.log(`Rollback successful: Deleted ${email} from Cognito due to DB failure.`);
+    } catch (rollbackError) {
+      console.error(`CRITICAL: Failed to rollback user ${email} from Cognito:`, rollbackError);
+    }
+
+    // Return the appropriate error to the frontend
+    if (dbError.code === 11000) {
+       return res.status(400).json({ message: 'Database conflict (Duplicate entry). Please check your details and try again.' });
+    }
+    return res.status(500).json({ message: dbError.message || 'Failed to save profile. Please try again.' });
   }
 };
+
+async function notifyAllAdmins({ type, title, message, link }) {
+  try {
+    const admins = await Admin.find({}, '_id');
+    if (!admins.length) return;
+    await Notification.insertMany(
+      admins.map((a) => ({ recipientId: a._id, recipientRole: 'admin', type, title, message, link }))
+    );
+  } catch (err) {
+    console.error("Failed to notify admins:", err);
+  }
+}
 
 /* ── 2. VERIFY INVITE CODE (Old Customer Entry) ── */
 exports.verifyInviteCode = async (req, res) => {
@@ -202,10 +294,8 @@ exports.claimAccount = async (req, res) => {
     }
 
     // 4. Update MongoDB Client Record
-    // Check if the chosen email matches an existing contact. If not, add it.
     const contactIndex = client.contacts.findIndex(c => c.email === email);
     if (contactIndex === -1) {
-      // Find the primary contact or just use the first one, and update their email
       const primaryIndex = client.contacts.findIndex(c => c.isPrimary);
       if (primaryIndex >= 0) {
         client.contacts[primaryIndex].email = email;
@@ -214,7 +304,7 @@ exports.claimAccount = async (req, res) => {
       }
     }
 
-    // Clear the invite code, mark as claimed, and instantly activate!
+    // Clear the invite code, mark as claimed, and instantly activate
     client.inviteCode = undefined;
     client.inviteCodeExpiry = undefined;
     client.isClaimed = true;

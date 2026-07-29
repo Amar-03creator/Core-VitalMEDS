@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const { registerClient, verifyInviteCode, claimAccount } = require('../controllers/authController');
+const { registerInit, registerVerify, verifyInviteCode, claimAccount } = require('../controllers/authController');
 const { authenticate } = require('../middleware/authMiddleware');
 const Admin = require('../models/Admin');
 const Client = require('../models/Client');
 
 // ── Registration ────────────────────────────────────────────────────────
-router.post('/register', registerClient);
+router.post('/register-init', registerInit);     // ✨ STEP A: Sends OTP
+router.post('/register-verify', registerVerify); // ✨ STEP B: Checks OTP & Saves
 router.post('/verify-invite', verifyInviteCode);
 router.post('/claim-account', claimAccount);
 
