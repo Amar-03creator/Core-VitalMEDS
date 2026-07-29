@@ -23,8 +23,10 @@
  * ============================================================================
  */
 
-import { useState, useRef } from 'react';
-import { ShoppingCart, ClipboardList, Lock, Tag, Image as ImageIcon, Check, AlertCircle } from 'lucide-react';
+// src/features/Client/ProductsPage/components/ProductDrawer.jsx
+
+import { useState, useRef, useEffect } from 'react';
+import { ShoppingCart, ClipboardList, Lock, Tag, Image as ImageIcon, Check, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner'; 
 import { useModalTrap, useScrollLock } from '../../../../hooks/useBackHandler';
 import { useCart } from '../../../../context/CartContext';
@@ -59,7 +61,6 @@ const ProductDrawer = ({ product, canOrder, onClose, onAddToOrder, onAddToInquir
     // Normal Mode: Global Stock MINUS Fenced Offer Stock
     let offerStockToExclude = 0;
     validBatches.forEach(b => {
-      // If a batch has an active offer, its stock is reserved!
       if (b.offer && (b.offer.isActive || b.offer.description)) {
         offerStockToExclude += (b.stock ?? b.remainingUnits ?? 0);
       }
@@ -81,8 +82,6 @@ const ProductDrawer = ({ product, canOrder, onClose, onAddToOrder, onAddToInquir
   const highestMrp = mrpSourceBatches.length > 0 ? Math.max(...mrpSourceBatches.map(b => b.mrp || 0)) : (product?.mrp || 0);
   
   const displayMrp = isOfferMode && displayBatch ? displayBatch.mrp : highestMrp;
-  
-  // Safe expiry is still shown to give them comfort about the date
   const displayExpiry = displayBatch ? displayBatch.parsedDate.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : 'N/A';
 
   useScrollLock(!!product);
@@ -91,26 +90,72 @@ const ProductDrawer = ({ product, canOrder, onClose, onAddToOrder, onAddToInquir
   const [dragY, setDragY] = useState(0);
   const touchStartY = useRef(0);
 
-  const handleTouchStart = (e) => { touchStartY.current = e.touches[0].clientY; };
-  const handleTouchMove = (e) => {
+  const handleTouchStartDrag = (e) => { touchStartY.current = e.touches[0].clientY; };
+  const handleTouchMoveDrag = (e) => {
     const diff = e.touches[0].clientY - touchStartY.current;
     if (diff > 0) setDragY(diff);
   };
-  const handleTouchEnd = () => {
+  const handleTouchEndDrag = () => {
     if (dragY > 100) onClose();
     else setDragY(0);
+  };
+
+  // ✨ Safe Image Extraction
+  // const rawImages = product?.images?.length > 0 ? [...product.images] : [];
+  // if (rawImages.length === 0 && (product?.photoUrl || product?.imageUrl || product?.photo)) {
+  //   rawImages.push(product.photoUrl || product.imageUrl || product.photo);
+  // }
+  // const productImages = rawImages
+  //   .map(img => typeof img === 'object' && img !== null ? (img.secure_url || img.url) : img)
+  //   .filter(Boolean);
+
+
+  // ✨ BULLETPROOF IMAGE EXTRACTION
+  const rawImages = product?.images?.length > 0 ? [...product.images] : [];
+  if (rawImages.length === 0 && (product?.photoUrl || product?.imageUrl || product?.photo)) {
+    rawImages.push(product.photoUrl || product.imageUrl || product.photo);
+  }
+  const productImages = rawImages
+    .map(img => {
+      if (!img) return null;
+      if (typeof img === 'string') return img;
+      // If a custom hook accidentally double-nested the URL object, dive inside it!
+      const target = typeof img.url === 'object' && img.url !== null ? img.url : img;
+      return target.secure_url || target.url || target.photoUrl || null;
+    })
+    .filter(Boolean);
+
+
+  // ✨ Carousel State & Logic
+  const [imgIndex, setImgIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+
+  useEffect(() => {
+    if (productImages.length <= 1 || isPaused) return;
+    const timer = setInterval(() => {
+      setImgIndex(prev => (prev + 1) % productImages.length);
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [productImages.length, isPaused]);
+
+  const nextImage = (e) => {
+    e.preventDefault(); e.stopPropagation();
+    setImgIndex((i) => (i + 1) % productImages.length);
+  };
+
+  const prevImage = (e) => {
+    e.preventDefault(); e.stopPropagation();
+    setImgIndex((i) => (i - 1 + productImages.length) % productImages.length);
   };
 
   if (!product) return null; 
 
   const hasOffer = !!product.offer;
   const shortCode = product.companyShortCode || product.companyDetails?.[0]?.shortCode || product.company;
-
   const identifier = product.productId || product._id || product.id;
   const isAlreadyInCart = orderItems.some(item => item.productId === identifier);
   const isAlreadyInInquiry = inquiryItems.some(item => item.productId === identifier);
 
-  // Pass batchId ONLY if in offer mode
   const payloadToCart = {
     ...product,
     productId: identifier,
@@ -137,7 +182,7 @@ const ProductDrawer = ({ product, canOrder, onClose, onAddToOrder, onAddToInquir
   const headerTheme = isCriticalStock && !outOfStock ? 'bg-red-50' : 'bg-slate-100';
 
   return (
-    <div className="fixed inset-0 z-70 flex items-end sm:items-center justify-center">
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/60 transition-opacity" onClick={onClose} />
 
       <div
@@ -146,15 +191,56 @@ const ProductDrawer = ({ product, canOrder, onClose, onAddToOrder, onAddToInquir
       >
         <div
           className="w-full flex justify-center py-4 bg-white cursor-grab shrink-0 z-10"
-          onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+          onTouchStart={handleTouchStartDrag} onTouchMove={handleTouchMoveDrag} onTouchEnd={handleTouchEndDrag}
         >
           <div className="w-14 h-1.5 bg-slate-300 rounded-full pointer-events-none" />
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 pb-6 space-y-6">
-          <div className={`w-full aspect-[5/4] rounded-2xl flex items-center justify-center relative overflow-hidden shrink-0 transition-colors ${headerTheme}`}>
-            {product.photoUrl ? (
-              <img src={product.photoUrl} alt={product.name} className="w-full h-full object-cover mix-blend-multiply" />
+          
+          {/* ✨ Carousel Container with Pause Handlers and Arrows */}
+          <div 
+            className={`w-full aspect-[4/4] rounded-2xl flex items-center justify-center relative overflow-hidden shrink-0 transition-colors ${headerTheme} group`}
+            onMouseEnter={() => setIsPaused(true)}
+            onMouseLeave={() => setIsPaused(false)}
+            onTouchStart={() => setIsPaused(true)}
+            onTouchEnd={() => setIsPaused(false)}
+            onTouchCancel={() => setIsPaused(false)}
+          >
+            {productImages.length > 0 ? (
+              <>
+                <img 
+                  src={productImages[imgIndex]} 
+                  alt={product.name} 
+                  className="w-full h-full object-cover mix-blend-multiply transition-opacity duration-300" 
+                  draggable={false}
+                />
+                
+                {productImages.length > 1 && (
+                  <>
+                    {/* Manual Navigation Arrows */}
+                    <button 
+                      onClick={prevImage} 
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 text-white rounded-full p-1.5 hover:bg-black/70 z-20 transition-all opacity-0 group-hover:opacity-100 sm:opacity-100"
+                    >
+                      <ChevronLeft size={20} />
+                    </button>
+                    <button 
+                      onClick={nextImage} 
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 text-white rounded-full p-1.5 hover:bg-black/70 z-20 transition-all opacity-0 group-hover:opacity-100 sm:opacity-100"
+                    >
+                      <ChevronRight size={20} />
+                    </button>
+
+                    {/* Navigation Dots */}
+                    <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5 z-20">
+                      {productImages.map((_, i) => (
+                        <div key={i} className={`w-1.5 h-1.5 rounded-full transition-colors ${i === imgIndex ? 'bg-slate-800' : 'bg-slate-300/80'}`} />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
             ) : (
               <ImageIcon size={56} className="text-slate-300" />
             )}
@@ -188,22 +274,26 @@ const ProductDrawer = ({ product, canOrder, onClose, onAddToOrder, onAddToInquir
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          
+          {/* ✨ Stacked Full-Width Grid Layout for Composition and Category */}
+          <div className="grid grid-cols-2 gap-2">
             {[
-              { label: 'Composition', value: product.compositions?.join(', ') || 'N/A', inline: false },
-              { label: 'Category', value: product.categories?.join(', ') || product.category || 'N/A', inline: false },
+              { label: 'Composition', value: product.compositions?.join(', ') || 'N/A', fullWidth: true },
+              { label: 'Category', value: product.categories?.join(', ') || product.category || 'N/A', fullWidth: true },
               { label: 'Type', value: product.type || 'N/A', inline: true },
               { label: 'GST Rate', value: `${product.gstRate || 0}%`, inline: true },
               { label: 'Expiry Date', value: displayExpiry, inline: true },
               { label: 'Delivery', value: product.deliveryTime || '< 24-48 hrs', inline: true },
             ].map((info, idx) => (
-              <div key={idx} className={`bg-slate-50 rounded-xl px-4 ${info.inline ? 'py-3.5 flex flex-wrap items-center' : 'py-4'}`}>
+              <div key={idx} className={`bg-slate-100 rounded-xl px-3 ${info.fullWidth ? 'col-span-2 py-3' : info.inline ? 'py-3 flex flex-wrap items-center' : 'py-3'}`}>
                 {info.inline ? (
                   <><span className="text-slate-500 text-sm font-bold uppercase tracking-wider mr-2">{info.label}:</span>
                     <span className="text-slate-900 text-sm font-bold">{info.value}</span></>
                 ) : (
-                  <><p className="text-slate-500 text-sm font-bold uppercase tracking-wider">{info.label}</p>
-                    <p className="text-slate-900 text-base font-bold mt-1 line-clamp-3">{info.value}</p></>
+                  <>
+                    <p className="text-slate-500 text-sm font-bold uppercase tracking-wider">{info.label}</p>
+                    <p className="text-slate-900 text-base font-bold mt-1">{info.value}</p>
+                  </>
                 )}
               </div>
             ))}

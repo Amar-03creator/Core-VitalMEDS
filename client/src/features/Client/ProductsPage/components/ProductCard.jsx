@@ -24,12 +24,12 @@
  */
 
 import { ShoppingCart, ClipboardList, Tag, Lock, Image as ImageIcon, Check, AlertCircle } from 'lucide-react';
-import { toast } from 'sonner'; 
+import { toast } from 'sonner';
 import { useCart } from '../../../../context/CartContext';
 
 const ProductCard = ({ product, canOrder, onView, onAddToOrder, onAddToInquiry, isOfferMode = false }) => {
   const { orderItems, inquiryItems } = useCart();
-  
+
   const today = new Date();
   const thresholdDays = product.shortExpiryThreshold || 90;
   const msPerDay = 1000 * 60 * 60 * 24;
@@ -65,9 +65,9 @@ const ProductCard = ({ product, canOrder, onView, onAddToOrder, onAddToInquiry, 
     // Calculate available normal stock (minimum 0)
     batchStock = Math.max(0, (product.totalStock || 0) - offerStockToExclude);
   }
-    
+
   const outOfStock = batchStock <= 0;
-  
+
   const lowStockThreshold = product.lowStockThreshold || 50;
   const criticalPercent = product.criticalStockThresholdPercent || 50;
   const criticalLimit = Math.floor(lowStockThreshold * (criticalPercent / 100));
@@ -77,9 +77,9 @@ const ProductCard = ({ product, canOrder, onView, onAddToOrder, onAddToInquiry, 
   // ✨ Calculate Highest MRP strictly from Safe Batches!
   const mrpSourceBatches = safeBatches.length > 0 ? safeBatches : validBatches;
   const highestMrp = mrpSourceBatches.length > 0 ? Math.max(...mrpSourceBatches.map(b => b.mrp || 0)) : (product.mrp || 0);
-  
+
   const displayMrp = isOfferMode && displayBatch ? displayBatch.mrp : highestMrp;
-  
+
   const shortCode = product.companyShortCode || product.companyDetails?.[0]?.shortCode || product.company;
   const hasOffer = !!product.offer;
 
@@ -91,7 +91,7 @@ const ProductCard = ({ product, canOrder, onView, onAddToOrder, onAddToInquiry, 
   const payloadToCart = {
     ...product,
     productId: identifier,
-    mrp: displayMrp, 
+    mrp: displayMrp,
     batchId: isOfferMode ? (displayBatch?._id || displayBatch?.id) : undefined
   };
 
@@ -102,25 +102,53 @@ const ProductCard = ({ product, canOrder, onView, onAddToOrder, onAddToInquiry, 
       return;
     }
     if (isAlreadyInCart) return;
-    onAddToOrder(payloadToCart, 1); 
+    onAddToOrder(payloadToCart, 1);
   };
 
   const handleInquiryClick = (e) => {
     e.stopPropagation();
     if (isAlreadyInInquiry) return;
-    onAddToInquiry(payloadToCart, 1); 
+    onAddToInquiry(payloadToCart, 1);
   };
 
-  const cardThemeClasses = isCriticalStock && !outOfStock 
-    ? 'bg-red-50/40 border-red-200' 
+  // // ✨ FIX: Extract Cloudinary Image URL safely
+  // const rawImages = product.images?.length > 0 ? [...product.images] : [];
+  // if (rawImages.length === 0 && (product.photoUrl || product.imageUrl || product.photo)) {
+  //   rawImages.push(product.photoUrl || product.imageUrl || product.photo);
+  // }
+  // const productImages = rawImages
+  //   .map(img => typeof img === 'object' && img !== null ? (img.secure_url || img.url) : img)
+  //   .filter(Boolean);
+  // const displayImageUrl = productImages.length > 0 ? productImages[0] : null;
+
+
+  // ✨ BULLETPROOF IMAGE EXTRACTION
+  const rawImages = product?.images?.length > 0 ? [...product.images] : [];
+  if (rawImages.length === 0 && (product?.photoUrl || product?.imageUrl || product?.photo)) {
+    rawImages.push(product.photoUrl || product.imageUrl || product.photo);
+  }
+  const productImages = rawImages
+    .map(img => {
+      if (!img) return null;
+      if (typeof img === 'string') return img;
+      // If a custom hook accidentally double-nested the URL object, dive inside it!
+      const target = typeof img.url === 'object' && img.url !== null ? img.url : img;
+      return target.secure_url || target.url || target.photoUrl || null;
+    })
+    .filter(Boolean);
+  const displayImageUrl = productImages.length > 0 ? productImages[0] : null;
+
+  const cardThemeClasses = isCriticalStock && !outOfStock
+    ? 'bg-red-50/40 border-red-200'
     : 'bg-white border-slate-200';
 
   return (
     <div className={`rounded-2xl border overflow-hidden flex flex-col transition-colors ${cardThemeClasses} ${outOfStock ? 'opacity-70' : ''}`}>
       <button onClick={() => onView(product)} className="block w-full relative">
         <div className="aspect-[5/4] bg-slate-100 flex items-center justify-center relative overflow-hidden">
-          {product.photoUrl ? (
-            <img src={product.photoUrl} alt={product.name} className="w-full h-full object-cover" />
+
+          {displayImageUrl ? (
+            <img src={displayImageUrl} alt={product.name} className="w-full h-full object-cover" />
           ) : (
             <ImageIcon size={40} className="text-slate-300" />
           )}
@@ -147,9 +175,9 @@ const ProductCard = ({ product, canOrder, onView, onAddToOrder, onAddToInquiry, 
             {shortCode}
           </span>
           {canOrder ? (
-              <span className="text-slate-900 font-black shrink-0">₹{displayMrp.toFixed(2)}</span>
+            <span className="text-slate-900 font-black shrink-0">₹{displayMrp.toFixed(2)}</span>
           ) : (
-              <span className="text-slate-400 font-medium text-sm italic shrink-0 mt-0.5">Hidden</span>
+            <span className="text-slate-400 font-medium text-sm italic shrink-0 mt-0.5">Hidden</span>
           )}
         </div>
 
@@ -178,13 +206,12 @@ const ProductCard = ({ product, canOrder, onView, onAddToOrder, onAddToInquiry, 
               <button
                 onClick={handleCartClick}
                 disabled={!canOrder || isAlreadyInCart}
-                className={`w-full flex items-center justify-center gap-2 text-md sm:text-base font-bold py-1.5 rounded-xl transition-colors ${
-                  !canOrder 
-                    ? 'bg-slate-100 text-slate-400 opacity-80 cursor-not-allowed' 
+                className={`w-full flex items-center justify-center gap-2 text-md sm:text-base font-bold py-1.5 rounded-xl transition-colors ${!canOrder
+                    ? 'bg-slate-100 text-slate-400 opacity-80 cursor-not-allowed'
                     : isAlreadyInCart
                       ? 'bg-emerald-100 text-emerald-700 cursor-default border border-emerald-200'
-                      : 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-sm' 
-                }`}
+                      : 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-sm'
+                  }`}
               >
                 {!canOrder ? <Lock size={14} /> : isAlreadyInCart ? <Check size={16} /> : <ShoppingCart size={16} />}
                 {isAlreadyInCart ? 'Added to Cart' : 'Add to Cart'}
@@ -194,11 +221,10 @@ const ProductCard = ({ product, canOrder, onView, onAddToOrder, onAddToInquiry, 
                 <button
                   onClick={handleInquiryClick}
                   disabled={isAlreadyInInquiry}
-                  className={`w-full flex items-center justify-center gap-2 text-md sm:text-base font-bold py-1.5 rounded-xl transition-colors ${
-                    isAlreadyInInquiry ? 'bg-slate-200 text-slate-700 cursor-default' : 'bg-slate-900 text-white hover:bg-slate-800 shadow-sm'
-                  }`}
+                  className={`w-full flex items-center justify-center gap-2 text-md sm:text-base font-bold py-1.5 rounded-xl transition-colors ${isAlreadyInInquiry ? 'bg-slate-200 text-slate-700 cursor-default' : 'bg-slate-900 text-white hover:bg-slate-800 shadow-sm'
+                    }`}
                 >
-                  {isAlreadyInInquiry ? <Check size={16} /> : <ClipboardList size={16} />} 
+                  {isAlreadyInInquiry ? <Check size={16} /> : <ClipboardList size={16} />}
                   {isAlreadyInInquiry ? 'Added for Inquiry' : 'Add for Inquiry'}
                 </button>
               )}
