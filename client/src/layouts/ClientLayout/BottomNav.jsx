@@ -16,7 +16,7 @@ const buildNavItems = (isApproved) => {
 
   items.push({
     to: '/client-dashboard/cart',
-    label: 'Order Now',
+    label: 'Cart',
     icon: ClipboardList,
     state: { initialTab: isApproved ? 'order' : 'inquiry' },
   });

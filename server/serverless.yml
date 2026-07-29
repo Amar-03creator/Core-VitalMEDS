@@ -4,7 +4,7 @@ provider:
   name: aws
   runtime: nodejs20.x
   region: ap-south-1
-  stage: prod # ✨ FIX: Changed to 'prod' so it updates the correct API Gateway!
+  stage: prod
   memorySize: 256
   timeout: 15
   httpApi:

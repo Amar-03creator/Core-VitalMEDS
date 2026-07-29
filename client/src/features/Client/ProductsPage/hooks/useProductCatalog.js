@@ -9,7 +9,6 @@ const mapProduct = (raw) => {
   const batches = raw.batches || [];
   const availableBatches = batches.filter((b) => (b.stock || 0) > 0);
   
-  // ✨ FIX: Safe Batch logic for the Catalog sorter
   const thresholdDays = raw.shortExpiryThreshold || 90;
   const msPerDay = 1000 * 60 * 60 * 24;
   const now = Date.now();
@@ -20,7 +19,6 @@ const mapProduct = (raw) => {
     return !isNaN(d) && ((d - now) / msPerDay) > thresholdDays;
   });
 
-  // ✨ Calculate MRP based only on safe batches so the "Sort" dropdown matches the cards!
   const mrpSource = safeBatches.length > 0 ? safeBatches : (availableBatches.length > 0 ? availableBatches : batches);
   const mrp = mrpSource.length > 0 ? Math.max(...mrpSource.map((b) => b.mrp || 0)) : (raw.mrp || 0);
   
@@ -32,18 +30,21 @@ const mapProduct = (raw) => {
     return days >= 0 && days <= NEAR_EXPIRY_DAYS;
   });
 
+  // ✨ FIX: Extract Cloudinary images array properly without overriding it with a single photoUrl string
+  const rawImages = raw.images?.length > 0 ? raw.images : (raw.photoUrl ? [raw.photoUrl] : []);
+  const processedImages = rawImages
+    .map(img => typeof img === 'object' && img !== null ? (img.secure_url || img.url) : img)
+    .filter(Boolean);
+
   return {
-    // ✨ FIX: Support both productId and id just in case!
     productId: raw.productId || raw.id, 
     name: raw.name,
     company: raw.company,
-    
     companyShortCode: raw.companyShortCode || raw.company, 
     categories: raw.categories || [],
     description: raw.description || '',
     usageTips: raw.usageTips || '',
-    photoUrl: raw.photoUrl || null,
-    
+    photoUrl: processedImages[0] || null,
     compositions: raw.compositions || [],
     packing: raw.packing,
     type: raw.type || raw.packing,
@@ -53,10 +54,8 @@ const mapProduct = (raw) => {
     mrp,
     totalStock,
     nearExpiry,
-    images: raw.photoUrl ? [raw.photoUrl] : [],
+    images: processedImages,
     batches,
-    
-    // ✨ THE FIX: We are officially letting the thresholds past the bouncer!
     shortExpiryThreshold: raw.shortExpiryThreshold || 90,
     lowStockThreshold: raw.lowStockThreshold || 50,
     criticalStockThresholdPercent: raw.criticalStockThresholdPercent || 50,

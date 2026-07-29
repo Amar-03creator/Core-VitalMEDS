@@ -4,8 +4,7 @@ const AWS = require('aws-sdk');
 
 const REGION = process.env.AWS_REGION || 'ap-south-1';
 // Support both AWS_S3_BUCKET and S3_BUCKET_NAME so nothing breaks
-const BUCKET = process.env.S3_BUCKET_NAME;
-
+const BUCKET = process.env.S3_BUCKET_NAME || process.env.AWS_S3_BUCKET;
 // CRITICAL: signatureVersion 'v4' is required for presigned PUT URLs in modern regions
 const s3 = new AWS.S3({ 
   region: REGION,

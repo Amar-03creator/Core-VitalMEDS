@@ -188,7 +188,6 @@ exports.updateClient = async (req, res) => {
     const errors = [];
 
     if (!establishmentName) errors.push('Establishment Name is required.');
-    if (!gstin) errors.push('GSTIN is required.');
     if (gstin && !isValidGSTIN(gstin)) errors.push('Invalid GSTIN format.');
     if (pan && !isValidPAN(pan)) errors.push('Invalid PAN format.');
     if (aadhaar && !isValidAadhaar(aadhaar)) errors.push('Invalid Aadhaar format.');
@@ -205,8 +204,9 @@ exports.updateClient = async (req, res) => {
 
     if (errors.length > 0) return res.status(400).json({ message: errors.join(' ') });
 
+    // Duplicate checks – only run if the field has a non‑empty value
     const uniqueChecks = [];
-    uniqueChecks.push(findOwnerOf('gstin', gstin, id).then(o => o && `GSTIN already registered with ${o}.`));
+    if (gstin) uniqueChecks.push(findOwnerOf('gstin', gstin, id).then(o => o && `GSTIN already registered with ${o}.`));
     if (pan) uniqueChecks.push(findOwnerOf('pan', pan, id).then(o => o && `PAN already registered with ${o}.`));
     if (aadhaar) uniqueChecks.push(findOwnerOf('aadhaar', aadhaar, id).then(o => o && `Aadhaar already registered with ${o}.`));
 
@@ -223,20 +223,21 @@ exports.updateClient = async (req, res) => {
     const dupeMessages = (await Promise.all(uniqueChecks)).filter(Boolean);
     if (dupeMessages.length > 0) return res.status(409).json({ message: dupeMessages.join(' ') });
 
+    // Apply updates – convert empty strings to undefined for optional fields with validators
     existing.establishmentName = establishmentName;
     existing.businessType = businessType;
     if (status) existing.status = status;
-    existing.gstin = gstin;
-    existing.pan = pan;
-    existing.aadhaar = aadhaar;
-    existing.drugLicenses = drugLicenses;
+    existing.gstin = gstin || undefined;
+    existing.pan = pan || undefined;
+    existing.aadhaar = aadhaar || undefined;
+    existing.pincode = pincode || undefined;
+    existing.drugLicenses = drugLicenses || [];
     existing.billingAddress = billingAddress;
-    existing.shippingAddress = shippingAddress;
+    existing.shippingAddress = shippingAddress || undefined;
     existing.city = city;
     existing.district = district;
     existing.state = state;
-    existing.pincode = pincode;
-    existing.line = line;
+    existing.line = line || undefined;
     existing.creditLimit = creditLimit;
     existing.paymentTermsDays = paymentTermsDays;
     existing.defaultDiscountPercent = defaultDiscountPercent;

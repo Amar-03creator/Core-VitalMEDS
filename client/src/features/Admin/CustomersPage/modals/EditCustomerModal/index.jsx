@@ -67,13 +67,21 @@ export const EditCustomerModal = ({ client, onClose, onSaved }) => {
   };
 
   const isValid = () => {
-    if (!formData.establishmentName.trim()) { toast.error('Establishment name is required'); return false; }
-    if (!formData.gstin.trim())              { toast.error('GSTIN is required'); return false; }
-    if (!formData.billingAddress.trim())     { toast.error('Billing address is required'); return false; }
+    // Mandatory fields – only the absolute minimum for a valid customer record
+    if (!formData.establishmentName.trim()) {
+      toast.error('Establishment name is required');
+      return false;
+    }
+    if (!formData.billingAddress.trim()) {
+      toast.error('Billing address is required');
+      return false;
+    }
     if (!formData.contacts?.some(c => c.name.trim())) {
       toast.error('At least one contact name is required');
       return false;
     }
+
+    // Format validations for optional fields (only if they contain something)
     let hasError = false;
     const newErrors = { ...errors };
     ['gstin','pan','aadhaar','pincode'].forEach(field => {
@@ -89,7 +97,10 @@ export const EditCustomerModal = ({ client, onClose, onSaved }) => {
       }
     });
     setErrors(newErrors);
-    if (hasError) { toast.error('Please fix the highlighted fields'); return false; }
+    if (hasError) {
+      toast.error('Please fix the highlighted fields');
+      return false;
+    }
     return true;
   };
 
