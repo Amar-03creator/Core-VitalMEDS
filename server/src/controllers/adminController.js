@@ -142,30 +142,39 @@ exports.listDocumentRequests = async (req, res) => {
    body: { status: 'approved' | 'rejected', note, clientId }
    clientId is required since documentRequests is embedded, not its own
    collection — the requestId alone isn't enough to find the parent doc. */
+/* ── PUT /api/admin/documents/requests/:requestId ───────────────────── */
+
 exports.approveRejectDocumentRequest = async (req, res) => {
   try {
     const { requestId } = req.params;
-    const { status, note, clientId } = req.body;
+    // ✨ FIX 1: Accept both 'note' and 'rejectionNote', and remove the strict clientId requirement
+    const { status, note, rejectionNote } = req.body;
 
     if (!['approved', 'rejected'].includes(status)) {
       return res.status(400).json({ message: "Status must be 'approved' or 'rejected'." });
     }
-    if (!clientId) return res.status(400).json({ message: 'clientId is required.' });
 
-    const client = await Client.findById(clientId);
-    if (!client) return res.status(404).json({ message: 'Client not found.' });
+    // ✨ FIX 2: Automatically find the exact client who owns this specific requestId!
+    const client = await Client.findOne({ "documentRequests._id": requestId });
+    if (!client) return res.status(404).json({ message: 'Document request or Client not found.' });
 
     const request = client.documentRequests.id(requestId);
-    if (!request) return res.status(404).json({ message: 'Document request not found.' });
-
     const admin = await findSelfAdmin(req);
+
+    const finalNote = note || rejectionNote;
 
     request.status = status;
     request.approvedBy = admin?._id;
+    
+    // Force a valid message string so Mongoose NEVER crashes
+    if (!request.message || request.message.trim() === '') {
+      request.message = status === 'approved' ? 'Request Approved by Admin' : (finalNote || 'Request Rejected by Admin');
+    }
+
     if (status === 'approved') {
       request.approvedAt = new Date();
     } else {
-      request.rejectionNote = note;
+      request.rejectionNote = finalNote;
     }
 
     await client.save();
@@ -178,7 +187,7 @@ exports.approveRejectDocumentRequest = async (req, res) => {
       message:
         status === 'approved'
           ? `You can now upload your updated ${request.documentType}.`
-          : `Your ${request.documentType} update request was rejected: ${note || 'no reason given'}.`,
+          : `Your ${request.documentType} update request was rejected: ${finalNote || 'no reason given'}.`,
       link: '/client-dashboard/profile',
     });
 
@@ -193,40 +202,52 @@ exports.approveRejectDocumentRequest = async (req, res) => {
    body: { documentType, verified } */
 exports.verifyClientDocument = async (req, res) => {
   try {
-    const { clientId } = req.params;
-    const { documentType, verified } = req.body;
-    if (!ALLOWED_DOC_TYPES.includes(documentType)) {
-      return res.status(400).json({ message: 'Invalid document type.' });
+    const { documentType, isVerified, rejectionNote } = req.body;
+    const client = await Client.findById(req.params.clientId);
+    if (!client) return res.status(404).json({ message: 'Client not found' });
+
+    // Initialize object if it doesn't exist
+    if (!client.documentVerification) client.documentVerification = {};
+    
+    // Set the specific document's verification status
+    client.documentVerification[documentType] = isVerified;
+
+    if (isVerified) {
+      // If Admin verifies, automatically resolve any open requests for this document
+      if (client.documentRequests) {
+        client.documentRequests.forEach(r => {
+          if (r.documentType === documentType && (r.status === 'pending' || r.status === 'rejected')) {
+            r.status = 'completed';
+            r.resolvedAt = new Date();
+            r.resolutionReason = 'client_approved';
+          }
+        });
+      }
+    } else {
+      // If Admin rejects, create a strict rejection request
+      client.documentRequests.push({
+        documentType,
+        // ✨ FIX: Provide a strict fallback string so Mongoose validation always passes
+        message: rejectionNote || 'Document rejected by Admin', 
+        rejectionNote: rejectionNote || 'Document rejected by Admin',
+        status: 'rejected',
+        requestedAt: new Date()
+      });
     }
 
-    const client = await Client.findById(clientId);
-    if (!client) return res.status(404).json({ message: 'Client not found.' });
+    // Auto-calculate the overall "Docs Verified" flag based on mandatory fields
+    const requiredDocs = [];
+    if (client.gstin) requiredDocs.push('gstCert');
+    if (client.drugLicenses && client.drugLicenses.length > 0) requiredDocs.push('dlCert');
+    if (client.panNumber) requiredDocs.push('panCard');
+    if (client.aadhaarNumber) requiredDocs.push('aadhaarCard');
 
-    client.documentVerification[documentType] = !!verified;
-    client.documentsVerified = ALLOWED_DOC_TYPES.every((t) => client.documentVerification[t]);
-
-    if (client.documentsVerified) {
-      const admin = await findSelfAdmin(req);
-      client.documentsVerifiedBy = admin?._id;
-      client.documentsVerifiedAt = new Date();
-    }
+    client.documentsVerified = requiredDocs.every(doc => client.documentVerification[doc]);
 
     await client.save();
-
-    await Notification.create({
-      recipientId: client._id,
-      recipientRole: 'client',
-      type: 'document',
-      title: verified ? 'Document verified' : 'Document needs changes',
-      message: verified
-        ? `Your ${documentType} has been verified.`
-        : `Your ${documentType} needs changes. Please contact support or re-upload.`,
-      link: '/client-dashboard/profile',
-    });
-
-    res.json({ success: true, data: client });
+    res.json({ success: true, message: `Document ${isVerified ? 'verified' : 'rejected'} successfully.` });
   } catch (err) {
-    console.error('verifyClientDocument error:', err);
+    console.error("verifyClientDocument Error:", err);
     res.status(500).json({ message: err.message });
   }
 };

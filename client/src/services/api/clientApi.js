@@ -123,7 +123,8 @@ export const clientApi = {
 
   /* ── Document Requests ────────────────────────────────────────────────── */
   async createDocumentRequest(clientId, payload) {
-    const res = await secureFetch(`/clients/${clientId}/document-requests`, {
+    // ✨ FIX: Prepend /admin to match the router mount path
+    const res = await secureFetch(`/admin/clients/${clientId}/documents/request`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -138,9 +139,30 @@ export const clientApi = {
     return res.json();
   },
 
+  async approveRejectDocumentRequest(requestId, status, rejectionNote = '') {
+    // Hits the /api/admin/documents/requests/:requestId endpoint
+    const res = await secureFetch(`/admin/documents/requests/${requestId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, rejectionNote }),
+    });
+    if (!res.ok) throw new Error('Failed to process request');
+    return res.json();
+  },
+
   async resolveDocumentRequest(clientId, requestId) {
     const res = await secureFetch(`/clients/${clientId}/document-requests/${requestId}/resolve`, { method: 'PUT' });
     if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to resolve request');
+    return res.json();
+  },
+
+  async verifyClientDocument(clientId, documentType, isVerified, rejectionNote = '') {
+    const res = await secureFetch(`/admin/clients/${clientId}/documents/verify`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ documentType, isVerified, rejectionNote }),
+    });
+    if (!res.ok) throw new Error('Failed to verify document');
     return res.json();
   },
 

@@ -2,32 +2,32 @@
 import { useState } from 'react';
 import { Edit, UserX, ShieldCheck } from 'lucide-react';   // keep imports for modals
 import { useCustomerDetail } from '../hooks/useCustomerDetail';
-import { SuspendOtpModal }   from '../modals/SuspendOtpModal'; 
+import { SuspendOtpModal } from '../modals/SuspendOtpModal';
 import { EditCustomerModal } from '../modals/EditCustomerModal';
-import { TakeActionModal }   from '../modals/TakeActionModal'; // ✨ RESTORED: The Document Request / Approval Modal
-import { CardContent }       from '../components/CustomerCard';
-import { STATUS_CFG }        from '../utils/constants';
-import { OverviewTab }  from './tabs/OverviewTab';
-import { InvoicesTab }  from './tabs/InvoicesTab';
-import { PaymentsTab }  from './tabs/PaymentsTab';
-import { LedgerTab }    from './tabs/LedgerTab';
-import { OrdersTab }    from './tabs/OrdersTab';
+import { TakeActionModal } from '../modals/TakeActionModal'; // ✨ RESTORED: The Document Request / Approval Modal
+import { CardContent } from '../components/CustomerCard';
+import { STATUS_CFG } from '../utils/constants';
+import { OverviewTab } from './tabs/OverviewTab';
+import { InvoicesTab } from './tabs/InvoicesTab';
+import { PaymentsTab } from './tabs/PaymentsTab';
+import { LedgerTab } from './tabs/LedgerTab';
+import { OrdersTab } from './tabs/OrdersTab';
 import { useBackHandler } from '../../../../hooks/useBackHandler';
 import { api } from '@/services/api';
 import { toast } from 'sonner';
 
 const TABS = [
-  { key: 'overview', label: 'Overview'  },
-  { key: 'orders',   label: 'Orders'    },
-  { key: 'invoices', label: 'Invoices'  },
-  { key: 'payments', label: 'Payments'  },
-  { key: 'ledger',   label: 'Ledger'    },
+  { key: 'overview', label: 'Overview' },
+  { key: 'orders', label: 'Orders' },
+  { key: 'invoices', label: 'Invoices' },
+  { key: 'payments', label: 'Payments' },
+  { key: 'ledger', label: 'Ledger' },
 ];
 
 export const CustomerDetailPage = ({
   clientId,
   customer,
-  onListChange, 
+  onListChange,
   onApprove,
   onReject, // ✨ RESTORED: Needed for the TakeActionModal
 }) => {
@@ -39,12 +39,12 @@ export const CustomerDetailPage = ({
   } = useCustomerDetail(clientId);
 
   const [suspendOpen, setSuspendOpen] = useState(false);
-  const [editOpen,    setEditOpen]    = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [takeActionOpen, setTakeActionOpen] = useState(false); // ✨ RESTORED
 
   useBackHandler(
-    activeTab !== 'overview', 
-    () => setActiveTab('overview'), 
+    activeTab !== 'overview',
+    () => setActiveTab('overview'),
     `tab_${clientId}` // Static ID so it survives F5 reloads!
   );
 
@@ -121,12 +121,12 @@ export const CustomerDetailPage = ({
         {client && (
           <>
             {activeTab === 'overview' && (
-              <OverviewTab 
-                client={client} 
-                onTakeAction={client.status === 'Pending' ? () => setTakeActionOpen(true) : undefined}
+              <OverviewTab
+                client={client}
+                onTakeAction={() => setTakeActionOpen(true)} 
                 onApprove={client.status === 'Pending' ? () => onApprove(client) : undefined}
-                onEdit={!isSuspended ? () => setEditOpen(true) : undefined} 
-                onSuspend={!isSuspended ? () => setSuspendOpen(true) : undefined} 
+                onEdit={!isSuspended ? () => setEditOpen(true) : undefined}
+                onSuspend={!isSuspended ? () => setSuspendOpen(true) : undefined}
                 onReactivate={isSuspended ? handleReactivate : undefined}
               />
             )}
@@ -165,8 +165,8 @@ export const CustomerDetailPage = ({
         <SuspendOtpModal
           customer={displayClient}
           onClose={() => setSuspendOpen(false)}
-          onConfirmSuccess={() => { 
-            setSuspendOpen(false); 
+          onConfirmSuccess={() => {
+            setSuspendOpen(false);
             if (onListChange) onListChange(); // Gracefully close and reload
           }}
         />
@@ -178,12 +178,12 @@ export const CustomerDetailPage = ({
           client={displayClient}
           onClose={() => setTakeActionOpen(false)}
           onApprove={() => {
-             setTakeActionOpen(false);
-             onApprove(displayClient);
+            setTakeActionOpen(false);
+            onApprove(displayClient);
           }}
           onReject={() => {
-             setTakeActionOpen(false);
-             onReject(displayClient);
+            setTakeActionOpen(false);
+            onReject(displayClient);
           }}
         />
       )}
