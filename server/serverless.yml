@@ -11,7 +11,7 @@ provider:
     cors: true
   # 👇 This is how AWS Lambda gets your environment variables!
   environment:
-    MONGO_URI: ${env:MONGO_URI}
+    MONGO_URI: mongodb+srv://vitalmedsAI_admin:Amarfiku456@vital-ai.24kpznh.mongodb.net/vitalmeds?appName=Vital-AI
     COGNITO_USER_POOL_ID: ap-south-1_t7cmqYdPT
     COGNITO_CLIENT_ID: 2gomoic0dpgtimj3dg8tfjqceu
     AWS_S3_BUCKET: corevitalmeds-kyc-vault
