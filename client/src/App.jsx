@@ -12,6 +12,8 @@ import { AuthProvider } from './context/AuthContext';
 import LandingPage from './pages/Public/landingPage';
 import LoginPage from './pages/Public/LoginPage';
 import RegisterPage from './pages/Public/RegistrationPage';
+import TermsOfService from './pages/Public/TermsOfService';
+import PrivacyPolicy from './pages/Public/PrivacyPolicy'
 
 // Client
 import ClientLayout from './layouts/ClientLayout/ClientLayout';
@@ -42,6 +44,7 @@ import NotificationsPage from './pages/Admin/NotificationsPage';
 import ExpiryOffersPage from './pages/Admin/OffersPage';
 import AdminSettingsPage from './pages/Admin/AdminSettingsPage';
 import ClaimAccount from './pages/Public/ClaimAccount';
+import ClientGuard from './components/ClientGuard'; // ✨ 
 
 function App() {
   return (
@@ -57,10 +60,13 @@ function App() {
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/claim-account" element={<ClaimAccount />} />
+                <Route path="/terms" element={<TermsOfService />} />
+                <Route path="/privacy" element={<PrivacyPolicy />} />
               </Route>
 
               {/* ✨ CLIENT PROTECTED ROUTES (Only accessible to Clients) */}
               <Route element={<ProtectedRoute allowedRoles={['client']} />}>
+                <Route element={<ClientGuard />}>
                 <Route path="/client-dashboard" element={<ClientLayout />}>
                   <Route index element={<ClientDashboard />} />
                   <Route path="products" element={<ClientProductsPage />} />
@@ -73,6 +79,7 @@ function App() {
                   <Route path="cart" element={<ClientCart />} />
                   <Route path="profile" element={<ClientProfilePage />} />
                   <Route path="offers" element={<ClientOffersPage />} /> {/* ✨ ADDED */}
+                </Route>
                 </Route>
               </Route>
 

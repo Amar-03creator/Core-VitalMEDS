@@ -7,8 +7,10 @@
 const Client = require('../models/Client');
 const Admin = require('../models/Admin');
 const Notification = require('../models/Notification');
-const { getUploadTicket } = require('../helpers/s3Helper');
 const AWS = require('aws-sdk');
+const s3 = new AWS.S3({ region: process.env.AWS_REGION });
+const { getUploadTicket, getDownloadUrl } = require('../helpers/s3Helper');
+const clientHelpers = require('./clientController/clientHelpers');
 
 const ALLOWED_DOC_TYPES = ['gstCert', 'dlCert', 'aadhaarCard', 'panCard'];
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
@@ -37,7 +39,23 @@ exports.getMyProfile = async (req, res) => {
   try {
     const client = await findSelf(req);
     if (!client) return res.status(404).json({ message: 'Client profile not found.' });
-    res.json({ success: true, data: client });
+
+    // Convert to plain object so we can sign the URLs
+    const clientObj = client.toObject();
+
+    // ✨ NEW: Sign URLs so the client can view their own private documents!
+    if (clientObj.documentUrls) {
+      for (const docType of Object.keys(clientObj.documentUrls)) {
+        const rawUrlString = clientObj.documentUrls[docType];
+        if (rawUrlString) {
+          const rawUrls = rawUrlString.split(',');
+          const signedUrls = rawUrls.map(u => getDownloadUrl(u));
+          clientObj.documentUrls[docType] = signedUrls.join(',');
+        }
+      }
+    }
+
+    res.json({ success: true, data: clientObj });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -79,8 +97,7 @@ exports.updateMyProfile = async (req, res) => {
     // 3. shippingAddress — always editable
     if (shippingAddress !== undefined) client.shippingAddress = shippingAddress;
 
-    // 4. contacts — must keep exactly one primary; a primary email/phone
-    //    change is synced to Cognito after save.
+    // 4. contacts
     let cognitoSync = null;
     if (contacts !== undefined) {
       if (!Array.isArray(contacts) || contacts.length === 0) {
@@ -112,10 +129,6 @@ exports.updateMyProfile = async (req, res) => {
 
     await client.save();
 
-    // Best-effort Cognito sync for a changed primary contact. I don't have
-    // visibility into whatever existing "change email/phone with OTP" flow
-    // the Settings > Security tab uses — if one already exists, prefer
-    // that over this and drop this block.
     if (cognitoSync) {
       try {
         const cognito = new AWS.CognitoIdentityServiceProvider({ region: process.env.AWS_REGION || 'ap-south-1' });
@@ -128,16 +141,12 @@ exports.updateMyProfile = async (req, res) => {
         if (attrs.length) {
           await cognito.adminUpdateUserAttributes({
             UserPoolId: process.env.COGNITO_USER_POOL_ID,
-            // Username was fixed to the original email at signup (see
-            // authController.js registerClient) — it does not change even
-            // if the email *attribute* does.
             Username: cognitoSync.oldEmail,
             UserAttributes: attrs,
           }).promise();
         }
       } catch (cognitoErr) {
         console.error('Cognito sync failed for primary contact change:', cognitoErr.message);
-        // Don't fail the request — the Mongo profile update already succeeded.
       }
     }
 
@@ -149,10 +158,10 @@ exports.updateMyProfile = async (req, res) => {
 };
 
 /* ── POST /api/clients/me/documents/request ───────────────────────── */
-/* body: { documentType, reason } */
+/* body: { documentType, message } */
 exports.requestDocumentUpload = async (req, res) => {
   try {
-    const { documentType, reason } = req.body;
+    const { documentType, message } = req.body;
     if (!ALLOWED_DOC_TYPES.includes(documentType)) {
       return res.status(400).json({ message: 'Invalid document type.' });
     }
@@ -160,8 +169,6 @@ exports.requestDocumentUpload = async (req, res) => {
     const client = await findSelf(req);
     if (!client) return res.status(404).json({ message: 'Client profile not found.' });
 
-    // First-ever upload of this type needs no approval — the client
-    // should call the upload-ticket endpoint directly instead.
     if (!client.documentFirstUploaded[documentType]) {
       return res.json({
         success: true,
@@ -177,7 +184,8 @@ exports.requestDocumentUpload = async (req, res) => {
       return res.status(409).json({ message: 'You already have a pending request for this document.' });
     }
 
-    client.documentRequests.push({ documentType, reason, status: 'pending', requestedAt: new Date() });
+    // ✨ FIX: Expects `message` now instead of `reason` based on schema requirements
+    client.documentRequests.push({ documentType, message, status: 'pending', requestedAt: new Date() });
     await client.save();
 
     await notifyAllAdmins({
@@ -210,11 +218,11 @@ exports.getDocumentUploadTicket = async (req, res) => {
     const isFirstUpload = !client.documentFirstUploaded[documentType];
 
     if (!isFirstUpload) {
-      const approvedRequest = client.documentRequests.find(
-        (r) => r.documentType === documentType && r.status === 'approved'
+      const openRequest = client.documentRequests.find(
+        (r) => r.documentType === documentType && (r.status === 'approved' || r.status === 'rejected')
       );
-      if (!approvedRequest) {
-        return res.status(403).json({ message: 'You need an approved request before re-uploading this document.' });
+      if (!openRequest) {
+        return res.status(403).json({ message: 'You need an open request before re-uploading this document.' });
       }
     }
 
@@ -231,11 +239,12 @@ exports.getDocumentUploadTicket = async (req, res) => {
   }
 };
 
-/* ── POST /api/clients/me/documents/confirm ───────────────────────── */
-/* body: { documentType, fileKey, fileUrl } */
+// POST /api/clients/me/documents/confirm
 exports.confirmDocumentUpload = async (req, res) => {
   try {
-    const { documentType, fileKey, fileUrl } = req.body;
+    // ✨ NEW: Destructure documentNumber from the body
+    const { documentType, fileKey, fileUrl, documentNumber } = req.body;
+    
     if (!ALLOWED_DOC_TYPES.includes(documentType)) {
       return res.status(400).json({ message: 'Invalid document type.' });
     }
@@ -244,28 +253,106 @@ exports.confirmDocumentUpload = async (req, res) => {
     const client = await findSelf(req);
     if (!client) return res.status(404).json({ message: 'Client profile not found.' });
 
-    const oldFileKey = client.documentUrls?.[documentType];
-    const isFirstUpload = !client.documentFirstUploaded[documentType];
+    // ✨ NEW: Validate and save the document number BEFORE processing jailbreak logic
+    if (documentNumber) {
+      let isValid = true;
+      if (documentType === 'panCard') isValid = clientHelpers.isValidPAN(documentNumber);
+      if (documentType === 'gstCert') isValid = clientHelpers.isValidGSTIN(documentNumber);
+      if (documentType === 'aadhaarCard') isValid = clientHelpers.isValidAadhaar(documentNumber);
+      if (documentType === 'dlCert') isValid = clientHelpers.isValidDL(documentNumber);
 
-    client.documentUrls[documentType] = fileUrl;
-    client.documentVerification[documentType] = false; // pending re-verification
+      if (!isValid) return res.status(400).json({ message: `Invalid format for ${documentType} number.` });
 
-    if (isFirstUpload) {
-      client.documentFirstUploaded[documentType] = true;
-    } else {
-      const approvedRequest = client.documentRequests
-        .filter((r) => r.documentType === documentType && r.status === 'approved')
-        .sort((a, b) => new Date(b.approvedAt) - new Date(a.approvedAt))[0];
-      if (approvedRequest) {
-        approvedRequest.status = 'completed';
-        approvedRequest.completedAt = new Date();
-        approvedRequest.newFileKey = fileKey;
-        approvedRequest.oldFileKey = oldFileKey;
+      // Check if another client is already using this ID
+      const fieldMap = {
+        gstCert: 'gstin',
+        panCard: 'panNumber',
+        aadhaarCard: 'aadhaarNumber',
+        dlCert: 'drugLicense' 
+      };
+      
+      const fieldName = fieldMap[documentType];
+      const duplicateMsg = await clientHelpers.findOwnerOf(fieldName, documentNumber, client._id);
+      
+      if (duplicateMsg) {
+        return res.status(400).json({ message: `This ID number is already registered to ${duplicateMsg}.` });
+      }
+
+      // Save to database
+      if (documentType === 'dlCert') {
+        client.drugLicenses = [documentNumber]; // Overwrites with new DL number
+      } else {
+        // Aadhaar, PAN, GST mapping
+        const mappedDbField = {
+          gstCert: 'gstin',
+          panCard: 'panNumber',
+          aadhaarCard: 'aadhaarNumber'
+        }[documentType];
+        client[mappedDbField] = documentNumber;
       }
     }
 
-    // Overall flag can only be true if every type is individually verified
-    client.documentsVerified = ALLOWED_DOC_TYPES.every((t) => client.documentVerification[t]);
+    const oldUrlString = client.documentUrls?.[documentType];
+    const isFirstUpload = !client.documentFirstUploaded?.[documentType];
+
+    // The Automated Orphan Deletion System (Cleans S3 Storage!)
+    if (oldUrlString && oldUrlString !== fileUrl) {
+      const oldUrls = oldUrlString.split(',');
+      for (const url of oldUrls) {
+        try {
+          const urlObj = new URL(url);
+          const oldKey = decodeURIComponent(urlObj.pathname.substring(1));
+          await s3.deleteObject({ 
+            Bucket: process.env.S3_BUCKET_NAME || process.env.AWS_S3_BUCKET, 
+            Key: oldKey 
+          }).promise();
+        } catch (e) {
+          console.error("Failed to delete old S3 file. It might already be gone.", e);
+        }
+      }
+    }
+
+    if (!client.documentUrls) client.documentUrls = {}; 
+    client.documentUrls[documentType] = fileUrl;
+    
+    if (!client.documentVerification) client.documentVerification = {};
+    client.documentVerification[documentType] = false; // ✨ Secures the Sneak-Edit Loophole (Resets Verification)
+
+    if (isFirstUpload) {
+      if (!client.documentFirstUploaded) client.documentFirstUploaded = {};
+      client.documentFirstUploaded[documentType] = true;
+    } else {
+      // Complete ALL open requests for this document (Approved Updates or Rejections)
+      if (client.documentRequests) {
+        client.documentRequests.forEach(req => {
+          if (req.documentType === documentType && (req.status === 'approved' || req.status === 'rejected')) {
+            req.status = 'completed';
+            req.resolvedAt = new Date();
+            req.newFileKey = fileKey;
+            req.oldFileKey = oldUrlString;
+            req.resolutionReason = 'uploaded';
+          }
+        });
+      }
+    }
+
+    // ✨ UPGRADED JAILBREAK LOGIC ✨
+    // Because we saved documentNumber above, this dynamically checks what the client just filled out!
+    const needsGST = !!client.gstin;
+    const needsDL = !!(client.drugLicenses && client.drugLicenses.length > 0);
+    const needsPAN = !!client.panNumber;
+    const needsAadhaar = !!client.aadhaarNumber;
+
+    const hasGST = !needsGST || !!client.documentFirstUploaded?.gstCert;
+    const hasDL = !needsDL || !!client.documentFirstUploaded?.dlCert;
+    const hasPAN = !needsPAN || !!client.documentFirstUploaded?.panCard;
+    const hasAadhaar = !needsAadhaar || !!client.documentFirstUploaded?.aadhaarCard;
+
+    if (hasGST && hasDL && hasPAN && hasAadhaar) {
+        client.documentsUploaded = true; 
+    }
+
+    client.documentsVerified = ALLOWED_DOC_TYPES.every((t) => client.documentVerification[t] || !client.documentFirstUploaded?.[t]);
 
     await client.save();
 

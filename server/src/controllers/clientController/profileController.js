@@ -5,6 +5,7 @@ const {
   isValidGSTIN, isValidPAN, isValidAadhaar, isValidDL,
   isValidEmail, isValidMobile, isValidPincode, strip91, findOwnerOf
 } = require('./clientHelpers');
+const { getDownloadUrl } = require('../../helpers/s3Helper');
 
 exports.getAllClients = async (req, res) => {
   try {
@@ -72,7 +73,24 @@ exports.getClientById = async (req, res) => {
   try {
     const client = await Client.findById(req.params.id).select('-__v');
     if (!client) return res.status(404).json({ message: 'Client not found' });
-    res.json({ success: true, data: client });
+    
+    // Convert to a plain JS object so we can modify the URLs
+    const clientObj = client.toObject();
+
+    // ✨ THE DECRYPTION: Loop through saved URLs and sign them
+    if (clientObj.documentUrls) {
+      for (const docType of Object.keys(clientObj.documentUrls)) {
+        const rawUrlString = clientObj.documentUrls[docType];
+        if (rawUrlString) {
+          // We split by comma to support the multiple Drug License images we are about to add!
+          const rawUrls = rawUrlString.split(',');
+          const signedUrls = rawUrls.map(u => getDownloadUrl(u));
+          clientObj.documentUrls[docType] = signedUrls.join(',');
+        }
+      }
+    }
+
+    res.json({ success: true, data: clientObj });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

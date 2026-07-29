@@ -47,6 +47,18 @@ const ClientProfilePage = () => {
 
   return (
     <div className="px-4 py-5 space-y-5 max-w-2xl mx-auto">
+      {/* ✨ THE JAIL BANNER */}
+      {profile && profile.documentsUploaded === false && (
+        <div className="bg-amber-50 border-2 border-amber-500 rounded-2xl p-4 mb-4 flex items-start gap-3 shadow-sm animate-in slide-in-from-top-4">
+          <ShieldCheck size={24} className="text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <h3 className="text-amber-900 font-black text-base">Account Activation Required</h3>
+            <p className="text-amber-800 text-sm mt-1 leading-relaxed">
+              Your dashboard and ordering capabilities are currently locked. Please navigate to the <b>Documents</b> tab below and securely upload your required KYC files.
+            </p>
+          </div>
+        </div>
+      )}
       <div>
         <h1 className="text-slate-900 text-2xl font-bold">My Account</h1>
         <p className="text-slate-500 text-sm mt-0.5">{profile.establishmentName}</p>

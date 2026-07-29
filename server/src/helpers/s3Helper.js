@@ -1,23 +1,16 @@
 // server/src/helpers/s3Helper.js
-//
-// NOTE: I didn't see an existing presigned-URL utility anywhere in the
-// files shared with me (the plan's "generate presigned URL as before"
-// implies one exists, likely from the registration document-upload flow).
-// If you already have one, point me to it and I'll swap this out — this
-// is a fresh implementation using the same `aws-sdk` v2 style already
-// used in authController.js.
-//
-// Requires AWS_S3_BUCKET (and reuses AWS_REGION) in your .env. The bucket
-// needs a CORS policy allowing PUT from your frontend origin, e.g.:
-//   AllowedMethods: [PUT], AllowedOrigins: ["http://localhost:5173", "https://yourdomain.com"],
-//   AllowedHeaders: ["*"]
 
 const AWS = require('aws-sdk');
 
 const REGION = process.env.AWS_REGION || 'ap-south-1';
-const BUCKET = process.env.AWS_S3_BUCKET;
+// Support both AWS_S3_BUCKET and S3_BUCKET_NAME so nothing breaks
+const BUCKET = process.env.S3_BUCKET_NAME;
 
-const s3 = new AWS.S3({ region: REGION });
+// CRITICAL: signatureVersion 'v4' is required for presigned PUT URLs in modern regions
+const s3 = new AWS.S3({ 
+  region: REGION,
+  signatureVersion: 'v4'
+});
 
 const DOCUMENT_FOLDER = 'client-documents';
 
@@ -29,14 +22,12 @@ const EXTENSION_BY_CONTENT_TYPE = {
 };
 
 /**
- * Generates a short-lived presigned PUT URL the client's browser can
- * upload directly to S3 with — the file never passes through our server.
- *
+ * Generates a short-lived presigned PUT URL for direct browser-to-S3 uploads.
  * @returns {{ uploadUrl: string, key: string, fileUrl: string }}
  */
 function getUploadTicket({ clientId, documentType, contentType }) {
   if (!BUCKET) {
-    throw new Error('AWS_S3_BUCKET is not configured in the environment.');
+    throw new Error('AWS_S3_BUCKET / S3_BUCKET_NAME is not configured in environment variables.');
   }
 
   const ext = EXTENSION_BY_CONTENT_TYPE[contentType] || 'pdf';
@@ -45,16 +36,35 @@ function getUploadTicket({ clientId, documentType, contentType }) {
   const uploadUrl = s3.getSignedUrl('putObject', {
     Bucket: BUCKET,
     Key: key,
-    Expires: 300, // 5 minutes
+    Expires: 60, // 60 seconds is security best practice for edge uploads
     ContentType: contentType,
   });
 
-  // Assumes the object (or the bucket) is readable at this URL once
-  // uploaded. If your bucket is private, swap this for a signed GET URL
-  // generated on read instead of storing a bare URL.
   const fileUrl = `https://${BUCKET}.s3.${REGION}.amazonaws.com/${key}`;
 
   return { uploadUrl, key, fileUrl };
 }
 
-module.exports = { getUploadTicket };
+/**
+ * Takes a raw, private S3 URL and generates a secure 5-minute viewing pass (GET URL).
+ * Used by the Admin dashboard to view KYC documents securely.
+ */
+function getDownloadUrl(fileUrl) {
+  if (!fileUrl) return null;
+  try {
+    const urlObj = new URL(fileUrl);
+    // Extract the exact file path from the URL (removes the leading slash)
+    const key = decodeURIComponent(urlObj.pathname.substring(1));
+    
+    return s3.getSignedUrl('getObject', {
+      Bucket: BUCKET,
+      Key: key,
+      Expires: 300 // Valid for exactly 5 minutes
+    });
+  } catch (e) {
+    console.error("Failed to sign URL:", e);
+    return fileUrl; // Fallback
+  }
+}
+
+module.exports = { getUploadTicket, getDownloadUrl };
