@@ -11,9 +11,10 @@ provider:
     cors: true
   # 👇 This is how AWS Lambda gets your environment variables!
   environment:
-    MONGO_URI: paste-your-mongodb-atlas-url-here
+    MONGO_URI: ${env:MONGO_URI}
     COGNITO_USER_POOL_ID: ap-south-1_t7cmqYdPT
     COGNITO_CLIENT_ID: 2gomoic0dpgtimj3dg8tfjqceu
+    AWS_S3_BUCKET: corevitalmeds-kyc-vault
 
 functions:
   api:
