@@ -59,13 +59,13 @@ const AdminDashboard = () => {
       {/* Greeting & Audit Button Header */}
       <div className="pt-1 flex items-start justify-between">
         <div>
-          <p className="text-slate-500 text-sm">{dateStr}</p>
+          <p className="text-slate-500 text-base">{dateStr}</p>
           <h1 className="text-slate-900 text-2xl font-bold mt-0.5">{greeting}, Amarnath 👋</h1>
         </div>
         <button 
           onClick={handleRunAudit} 
           disabled={isAuditing}
-          className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 font-semibold px-3 py-2 rounded-xl text-xs hover:bg-slate-50 active:scale-95 transition-all disabled:opacity-50"
+          className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 font-semibold px-3 py-2 mt-15 rounded-xl text-sm hover:bg-slate-50 active:scale-95 transition-all disabled:opacity-50"
         >
           {isAuditing ? <RefreshCw size={14} className="animate-spin text-emerald-600" /> : <Calculator size={14} className="text-emerald-600" />}
           {isAuditing ? 'Calculating...' : 'Run Audit'}
@@ -73,12 +73,12 @@ const AdminDashboard = () => {
       </div>
 
       <div>
-        <p className="text-slate-500 text-xs font-semibold uppercase tracking-widest mb-3">Daily To-Do</p>
+        <p className="text-slate-500 text-lg font-semibold uppercase tracking-widest mb-3">Daily To-Do</p>
         <KpiAlerts kpis={data.kpis} />
       </div>
 
       <div>
-        <h2 className="text-slate-700 font-semibold text-sm mb-3">Quick Actions</h2>
+        <h2 className="text-slate-700 font-semibold text-lg mb-3">Quick Actions</h2>
         <QuickActions />
       </div>
 

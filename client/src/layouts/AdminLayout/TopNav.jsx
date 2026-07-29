@@ -43,27 +43,12 @@ export const TopNav = ({ menuOpen, setMenuOpen, notifOpen, setNotifOpen, message
             <Pill size={18} className="text-white" />
           </div>
           <div>
-            <p className="text-white font-bold text-base leading-none tracking-tight">VitalMEDS</p>
-            <p className="text-emerald-400 text-[10px] font-semibold tracking-widest uppercase mt-0.5">Admin Portal</p>
+            <p className="text-white font-bold text-base leading-none tracking-tight">CoreVital MEDS</p>
+            <p className="text-emerald-400 text-xs font-semibold tracking-widest uppercase mt-0.5">Admin Portal</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-1">
-          {/* Messages button */}
-          <div className="relative">
-            <button
-              onClick={() => { setMessagesOpen(o => !o); setNotifOpen(false); setMenuOpen(false); }}
-              className={`relative p-2.5 rounded-xl transition-colors ${messagesOpen ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
-            >
-              <MessageSquare size={20} />
-              {totalUnreadTickets > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5">
-                  {totalUnreadTickets}
-                </span>
-              )}
-            </button>
-            {messagesOpen && <MessagesDropdown onClose={() => setMessagesOpen(false)} />}
-          </div>
+        <div className="flex items-center gap-3">          
 
           {/* Notifications button */}
           <div className="relative">
@@ -71,9 +56,9 @@ export const TopNav = ({ menuOpen, setMenuOpen, notifOpen, setNotifOpen, message
               onClick={() => { setNotifOpen(o => !o); setMessagesOpen(false); setMenuOpen(false); fetchNotifs(); }}
               className={`relative p-2.5 rounded-xl transition-colors ${notifOpen ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
             >
-              <Bell size={20} />
+              <Bell size={24} />
               {totalUnreadNotif > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-emerald-400 text-slate-900 text-[9px] font-black rounded-full flex items-center justify-center px-0.5">
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-emerald-400 text-slate-900 text-[11px] font-black rounded-full flex items-center justify-center px-0.5">
                   {totalUnreadNotif}
                 </span>
               )}

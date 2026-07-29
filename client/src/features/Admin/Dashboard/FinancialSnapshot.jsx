@@ -13,7 +13,7 @@ export const FinancialSnapshot = ({ period, setPeriod, financials }) => {
         <div className="flex gap-1 bg-slate-800 rounded-xl p-1">
           {['month', 'year'].map(p => (
             <button key={p} onClick={() => setPeriod(p)}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all capitalize ${period === p ? 'bg-emerald-500 text-white shadow' : 'text-slate-400 hover:text-white'}`}>
+              className={`px-3 py-1 rounded-lg text-sm font-bold transition-all capitalize ${period === p ? 'bg-emerald-500 text-white shadow' : 'text-slate-400 hover:text-white'}`}>
               {p === 'month' ? 'This Month' : 'This Year'}
             </button>
           ))}
@@ -33,7 +33,7 @@ export const FinancialSnapshot = ({ period, setPeriod, financials }) => {
             </div>
             <div className={`flex items-center gap-1 text-sm font-semibold ${positive ? 'text-emerald-400' : 'text-red-400'}`}>
               <ArrowUpRight size={14} className={positive ? '' : 'rotate-180'} />
-              <span className="text-right text-xs">{sub}</span>
+              <span className="text-right text-base">{sub}</span>
             </div>
           </div>
         ))}

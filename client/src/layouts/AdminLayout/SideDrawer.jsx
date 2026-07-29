@@ -48,13 +48,13 @@ export const SideDrawer = ({ open, onClose, currentPath }) => {
         <div className="h-full flex flex-col bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 border-l border-white/10 rounded-l-2xl shadow-2xl">
           {/* Profile card */}
           <div className="mx-4 mt-5 mb-4 rounded-2xl overflow-hidden bg-white/5 border border-white/10">
-            <div className="flex items-center gap-3 px-4 py-3.5">
+            <div className="flex items-center gap-3 px-4 py-3">
               <div className="w-11 h-11 rounded-xl bg-emerald-500 flex items-center justify-center text-white font-black text-base shadow-lg shadow-emerald-500/30 shrink-0">A</div>
               <div className="flex-1 min-w-0">
-                <p className="text-white font-bold text-sm">Amarnath Nayak</p>
+                <p className="text-white font-bold text-base">Amarnath Nayak</p>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/20 px-1.5 py-0.5 rounded-md">ADMIN</span>
-                  <span className="text-slate-400 text-[10px]">VitalMEDS</span>
+                  <span className="text-xs font-bold text-emerald-400 bg-emerald-500/20 px-1.5 py-0.5 rounded-md">ADMIN</span>
+                  <span className="text-slate-400 text-xs">CoreVital MEDS</span>
                 </div>
               </div>
               <div className="text-slate-500"><TrendingUp size={16} className="text-emerald-400/60" /></div>
@@ -77,7 +77,7 @@ export const SideDrawer = ({ open, onClose, currentPath }) => {
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-all ${active ? 'bg-emerald-500/20' : 'bg-white/5 group-hover:bg-white/10'}`}>
                     <Icon size={16} strokeWidth={active ? 2.2 : 1.8} />
                   </div>
-                  <span className={`text-sm font-medium flex-1 ${active ? 'font-semibold' : ''}`}>{label}</span>
+                  <span className={`text-base font-medium flex-1 ${active ? 'font-semibold' : ''}`}>{label}</span>
                   {active && <ChevronRight size={14} className="text-emerald-400/70 shrink-0" />}
                 </Link>
               );
@@ -85,17 +85,17 @@ export const SideDrawer = ({ open, onClose, currentPath }) => {
           </div>
 
           {/* Footer */}
-          <div className="px-4 pb-8 pt-3 border-t border-white/10 space-y-2">
+          <div className="px-4 py-3 border-t border-white/10 space-y-2">
             <Link 
             to="/admin-dashboard/settings" 
             // onClick={onClose} 
             className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 transition-all">
               <Settings size={16} />
-              <span className="text-sm font-medium">Settings</span>
+              <span className="text-base font-medium">Settings</span>
             </Link>
-            <button onClick={logout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-400/80 hover:text-red-400 hover:bg-red-500/10 transition-all">
+            <button onClick={logout} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-red-400/80 hover:text-red-400 hover:bg-red-500/10 transition-all">
               <LogOut size={16} />
-              <span className="text-sm font-medium">Sign Out</span>
+              <span className="text-base font-medium">Sign Out</span>
             </button>
           </div>
         </div>
