@@ -3,18 +3,19 @@ const SalesInvoice = require('../models/SalesInvoice');
 const PaymentReceipt = require('../models/PaymentReceipt');
 const Client = require('../models/Client');
 const Batch = require('../models/Batch');
-// const Order = require('../models/Order'); // Uncomment when you have an Order model
+const Order = require('../models/Order');
+const Inquiry = require('../models/Inquiry');
 
 exports.getDashboardStats = async (req, res) => {
   try {
     const now = new Date();
-    
+
     // Time Boundaries
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-    
+
     const startOfYear = new Date(now.getFullYear(), 0, 1);
     const endOfYear = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
     const startOfLastYear = new Date(now.getFullYear() - 1, 0, 1);
@@ -22,10 +23,17 @@ exports.getDashboardStats = async (req, res) => {
 
     // --- 1. KPI ALERTS ---
     const nearExpiryCount = await Batch.countDocuments({ nearExpiry: true, totalStockQuantity: { $gt: 0 } });
-    const lowStockCount = await Batch.countDocuments({ totalStockQuantity: { $lte: 10, $gt: 0 } }); // Adjust threshold as needed
-    // Mocking orders since schema wasn't provided, adjust logic once you add Order model
-    const pendingOrdersCount = 0; // await Order.countDocuments({ status: 'Pending' }); 
-    const openInquiriesCount = 0; // await Inquiry.countDocuments({ status: 'Open' });
+    const lowStockCount = await Batch.countDocuments({ totalStockQuantity: { $lte: 10, $gt: 0 } });
+
+    // ✨ FIX: Count active orders awaiting invoicing
+    const pendingOrdersCount = await Order.countDocuments({
+      status: { $in: ['Placed', 'Editing', 'Confirmed', 'Invoiced', 'Packed', 'Shipped'] }
+    });
+
+    // ✨ FIX: Count active inquiries awaiting quotes or conversion
+    const openInquiriesCount = await Inquiry.countDocuments({
+      status: { $in: ['Pending', 'Viewed', 'Quoted'] }
+    });
 
     // --- 2. FINANCIAL SNAPSHOT ---
     const getFinancials = async (start, end) => {
@@ -76,13 +84,15 @@ exports.getDashboardStats = async (req, res) => {
       return SalesInvoice.aggregate([
         { $match: { invoiceDate: { $gte: start, $lte: end }, invoiceStatus: { $ne: 'CANCELLED' } } },
         { $unwind: '$items' },
-        { $group: { 
-            _id: '$items.productId', 
-            name: { $first: '$items.productName' }, 
-            company: { $first: '$items.companyShortCode' }, 
-            sold: { $sum: '$items.billedQty' }, 
-            revenue: { $sum: '$items.lineTotal' } 
-        }},
+        {
+          $group: {
+            _id: '$items.productId',
+            name: { $first: '$items.productName' },
+            company: { $first: '$items.companyShortCode' },
+            sold: { $sum: '$items.billedQty' },
+            revenue: { $sum: '$items.lineTotal' }
+          }
+        },
         { $sort: { revenue: -1 } },
         { $limit: 5 }
       ]);
@@ -93,8 +103,11 @@ exports.getDashboardStats = async (req, res) => {
     ]);
 
     // --- 4. TOP PARTIES ---
+    // Calculate exactly 3 months back from the start of the current month (e.g., if July, starts May 1st)
+    const startOf3Months = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+
     const topPartiesVolume = await SalesInvoice.aggregate([
-      { $match: { invoiceDate: { $gte: startOfMonth, $lte: endOfMonth }, invoiceStatus: { $ne: 'CANCELLED' } } },
+      { $match: { invoiceDate: { $gte: startOf3Months, $lte: endOfMonth }, invoiceStatus: { $ne: 'CANCELLED' } } },
       { $group: { _id: '$clientObjectId', name: { $first: '$clientName' }, value: { $sum: '$netAmount' } } },
       { $sort: { value: -1 } },
       { $limit: 4 },
@@ -103,8 +116,22 @@ exports.getDashboardStats = async (req, res) => {
       { $project: { name: 1, value: 1, tier: { $ifNull: ['$clientInfo.partyTier', 'Silver'] }, score: { $ifNull: ['$clientInfo.creditScore', 50] } } }
     ]);
 
-    const topPartiesSpeed = await Client.find({ averagePaymentTime: { $gt: 0 } }).sort({ averagePaymentTime: 1 }).limit(4).select('establishmentName partyTier averagePaymentTime creditScore');
-    const topPartiesMVP = await Client.find({ creditScore: { $gt: 0 } }).sort({ creditScore: -1 }).limit(4).select('establishmentName partyTier creditScore');
+    // ✨ NEW: Get a list of Client IDs who have actually placed an order/invoice in the last 3 months
+    const activeClientIds = await SalesInvoice.distinct('clientObjectId', {
+      invoiceDate: { $gte: startOf3Months, $lte: endOfMonth },
+      invoiceStatus: { $ne: 'CANCELLED' }
+    });
+
+    // ✨ UPDATE: Filter MVP and Speed strictly by clients who are in the activeClientIds array
+    const topPartiesSpeed = await Client.find({
+      _id: { $in: activeClientIds },
+      averagePaymentTime: { $gt: 0 }
+    }).sort({ averagePaymentTime: 1 }).limit(4).select('establishmentName partyTier averagePaymentTime creditScore');
+
+    const topPartiesMVP = await Client.find({
+      _id: { $in: activeClientIds },
+      creditScore: { $gt: 0 }
+    }).sort({ creditScore: -1 }).limit(4).select('establishmentName partyTier creditScore');
 
     // --- 5. CONCERNED PARTIES ---
     const concernedPartiesRaw = await Client.find({ totalOutstanding: { $gt: 0 } }).select('establishmentName totalOutstanding outstandingDate partyTier creditScore');
@@ -120,7 +147,7 @@ exports.getDashboardStats = async (req, res) => {
         financials,
         topProducts: { month: topProductsMonth, year: topProductsYear },
         topParties: {
-          volume: topPartiesVolume.map(p => ({ name: p.name, tier: p.tier, value: `₹${p.value.toLocaleString('en-IN')}`, score: p.score, meta: 'this month' })),
+          volume: topPartiesVolume.map(p => ({ name: p.name, tier: p.tier, value: `₹${p.value.toLocaleString('en-IN')}`, score: p.score, meta: 'last 3 months' })),
           speed: topPartiesSpeed.map(p => ({ name: p.establishmentName, tier: p.partyTier, value: `${p.averagePaymentTime} days`, score: p.creditScore || 50, meta: 'avg pay time' })),
           mvp: topPartiesMVP.map(p => ({ name: p.establishmentName, tier: p.partyTier, value: `${p.creditScore}/100`, score: p.creditScore, meta: 'credit score' }))
         },

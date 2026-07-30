@@ -34,25 +34,28 @@ export const TopParties = ({ data }) => {
         </div>
       </div>
       <div className="divide-y divide-slate-50">
-        {parties.length === 0 ? <p className="px-4 py-6 text-center text-slate-400 text-sm">No data available.</p> : parties.map(({ name, tier, value, score, meta }, i) => (
+        {parties.length === 0 ? <p className="px-4 py-6 text-center text-slate-400 text-sm">No active data in the last 3 months.</p> : parties.map(({ name, tier, value, score, meta }, i) => (
           <div key={name} className="px-4 py-3.5 flex items-center gap-3">
             <span className="text-slate-300 text-sm font-bold w-5 shrink-0">{i + 1}</span>
-            <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-700 font-bold text-sm shrink-0">{name[0]}</div>
+            <div className="w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center text-slate-700 font-black text-base shrink-0 uppercase">{name[0]}</div>
             <div className="flex-1 min-w-0">
-              <p className="text-slate-800 text-sm font-semibold truncate">{name}</p>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${tierColorsLight[tier]}`}>{tier}</span>
-                <div className="flex items-center gap-1">
-                  <div className="w-14 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+              <p className="text-slate-900 text-base font-bold truncate">{name}</p>
+              <div className="flex items-center gap-2.5 mt-1">
+                {/* ✨ FIX: Increased Tier badge size */}
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${tierColorsLight[tier]}`}>{tier}</span>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-16 h-2 bg-slate-100 rounded-full overflow-hidden">
                     <div className={`h-full rounded-full ${score >= 80 ? 'bg-emerald-500' : score >= 50 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${score}%` }} />
                   </div>
-                  <span className="text-[10px] text-slate-400">{score}</span>
+                  {/* ✨ FIX: Increased Score text size */}
+                  <span className="text-xs font-medium text-slate-500">{score}</span>
                 </div>
               </div>
             </div>
             <div className="text-right shrink-0">
-              <p className="text-slate-800 text-sm font-bold">{value}</p>
-              <p className="text-slate-400 text-[11px]">{meta}</p>
+              <p className="text-slate-800 text-base font-bold">{value}</p>
+              {/* ✨ FIX: Increased Meta text size */}
+              <p className="text-slate-500 text-xs font-medium mt-0.5">{meta}</p>
             </div>
           </div>
         ))}
