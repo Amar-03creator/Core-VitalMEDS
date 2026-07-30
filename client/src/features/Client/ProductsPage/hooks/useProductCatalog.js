@@ -56,6 +56,8 @@ const mapProduct = (raw) => {
     nearExpiry,
     images: processedImages,
     batches,
+    // sold: raw.sold || raw.totalSold || 0,
+    salesRank: raw.salesRank || 999999,
     shortExpiryThreshold: raw.shortExpiryThreshold || 90,
     lowStockThreshold: raw.lowStockThreshold || 50,
     criticalStockThresholdPercent: raw.criticalStockThresholdPercent || 50,

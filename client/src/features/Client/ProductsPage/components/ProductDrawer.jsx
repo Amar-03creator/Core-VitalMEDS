@@ -23,8 +23,6 @@
  * ============================================================================
  */
 
-// src/features/Client/ProductsPage/components/ProductDrawer.jsx
-
 import { useState, useRef, useEffect } from 'react';
 import { ShoppingCart, ClipboardList, Lock, Tag, Image as ImageIcon, Check, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner'; 
@@ -100,16 +98,6 @@ const ProductDrawer = ({ product, canOrder, onClose, onAddToOrder, onAddToInquir
     else setDragY(0);
   };
 
-  // ✨ Safe Image Extraction
-  // const rawImages = product?.images?.length > 0 ? [...product.images] : [];
-  // if (rawImages.length === 0 && (product?.photoUrl || product?.imageUrl || product?.photo)) {
-  //   rawImages.push(product.photoUrl || product.imageUrl || product.photo);
-  // }
-  // const productImages = rawImages
-  //   .map(img => typeof img === 'object' && img !== null ? (img.secure_url || img.url) : img)
-  //   .filter(Boolean);
-
-
   // ✨ BULLETPROOF IMAGE EXTRACTION
   const rawImages = product?.images?.length > 0 ? [...product.images] : [];
   if (rawImages.length === 0 && (product?.photoUrl || product?.imageUrl || product?.photo)) {
@@ -182,12 +170,15 @@ const ProductDrawer = ({ product, canOrder, onClose, onAddToOrder, onAddToInquir
   const headerTheme = isCriticalStock && !outOfStock ? 'bg-red-50' : 'bg-slate-100';
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center">
+    // ✨ FIX 1: Added sm:p-4 to give it a nice floating margin on laptops
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4">
       <div className="absolute inset-0 bg-black/60 transition-opacity" onClick={onClose} />
 
       <div
-        className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl flex flex-col overflow-hidden transition-transform duration-200 shadow-2xl"
-        style={{ transform: `translateY(${dragY}px)`, height: '82dvh' }}
+        // ✨ FIX 2: Added sm:max-w-[480px] for a better laptop width, and h-[85dvh] sm:h-[95vh] for maximum height!
+        className="relative w-full sm:max-w-[480px] bg-white rounded-t-3xl sm:rounded-3xl flex flex-col overflow-hidden transition-transform duration-200 shadow-2xl h-[85dvh] sm:h-[95vh]"
+        // ✨ FIX 3: Removed the hardcoded height from the style object
+        style={{ transform: `translateY(${dragY}px)` }}
       >
         <div
           className="w-full flex justify-center py-4 bg-white cursor-grab shrink-0 z-10"

@@ -3,22 +3,118 @@ const Product = require('../models/Product');
 const Batch = require('../models/Batch');
 const Notification = require('../models/Notification');
 const Client = require('../models/Client');
+const SalesInvoice = require('../models/SalesInvoice');
+const Order = require('../models/Order');
 
- 
 /* ── 1. Original: Get Products With Batches (Used for PDF Export & Catalog) ── */
+// exports.getProductsWithBatches = async (req, res) => {
+//   try {
+//     const products = await Product.find({}).populate('companyId', 'shortCode').lean();
+//     const productIds = products.map(p => p._id);
+
+//     // ✨ NEW: Fetch pending orders for Soft Allocation
+//     const Order = require('../models/Order');
+//     const liveOrders = await Order.find({
+//       status: { $in: ['Placed', 'Confirmed', 'Editing'] }
+//     }).select('items').lean();
+
+//     const globalAllocations = {}; 
+//     const batchAllocations = {};  
+
+//     liveOrders.forEach(order => {
+//       if (!order.items) return;
+//       order.items.forEach(item => {
+//         const pId = String(item.productId);
+//         const qty = Number(item.requestedQty || item.chargeableQty || 0);
+//         globalAllocations[pId] = (globalAllocations[pId] || 0) + qty;
+
+//         if (item.plannedBatches && item.plannedBatches.length > 0) {
+//           item.plannedBatches.forEach(pb => {
+//             const bId = String(pb.batchId);
+//             batchAllocations[bId] = (batchAllocations[bId] || 0) + Number(pb.chargeableQty || 0);
+//           });
+//         }
+//       });
+//     });
+
+//     const enriched = await Promise.all(
+//       products.map(async (product) => {
+//         const pIdStr = String(product._id);
+//         const batches = await Batch.find({ productId: product._id })
+//           .select('batchNumber mrp expiryDate totalStockQuantity offer')
+//           .lean();
+
+//         const batchList = batches.map(b => {
+//           const reservedInBatch = batchAllocations[String(b._id)] || 0;
+//           // ✨ Soft Allocation: Subtract pending orders from the batch stock
+//           const virtualBatchStock = Math.max(0, (b.totalStockQuantity || 0) - reservedInBatch);
+
+//           return {
+//             _id: b._id,
+//             no: b.batchNumber,
+//             mrp: b.mrp,
+//             expiry: b.expiryDate ? b.expiryDate.toISOString().split('T')[0] : '',
+//             stock: virtualBatchStock, 
+//             offer: b.offer?.isActive ? b.offer : null,
+//           };
+//         });
+
+//         // ✨ Soft Allocation: Subtract pending orders from the global stock
+//         const totalReserved = globalAllocations[pIdStr] || 0;
+//         const virtualTotalStock = Math.max(0, (product.totalStock || 0) - totalReserved);
+
+//         const firstBatch = batchList[0];
+//         const computedRate = firstBatch && firstBatch.mrp
+//           ? parseFloat((firstBatch.mrp * 0.8).toFixed(2))
+//           : 0;
+
+//         return {
+//           productId: product._id, // ✨ FIXED: Maps perfectly to the Cart now!
+//           name: product.name,
+//           company: product.company,
+//           companyShortCode: product.companyId ? product.companyId.shortCode : product.company,
+//           categories: product.categories,
+//           description: product.description,
+//           usageTips: product.usageTips,
+//           type: product.type,
+//           compositions: product.compositions,
+//           packing: product.packing,
+//           hsn: product.hsnCode,
+//           gstRate: product.gstRate,
+//           mrp: product.mrp || 0,
+//           photoUrl: (product.images && product.images.length > 0) ? product.images[0] : (product.photoUrl || ''),
+//           images: product.images || [],
+//           defaultRate: computedRate,    
+//           batches: batchList,
+//           sold: product.totalSold || product.sold || 0,
+
+//           totalStock: virtualTotalStock, // Sends the Soft Allocated stock to the frontend!
+//           shortExpiryThreshold: product.shortExpiryThreshold || 90,
+//           lowStockThreshold: product.lowStockThreshold || 50,
+//           criticalStockThresholdPercent: product.criticalStockThresholdPercent || 50,
+//         };
+//       })
+//     );
+
+//     res.status(200).json({ success: true, data: enriched });
+//   } catch (error) {
+//     res.status(500).json({ message: error.message });
+//   }
+// };
+
+
 exports.getProductsWithBatches = async (req, res) => {
   try {
     const products = await Product.find({}).populate('companyId', 'shortCode').lean();
     const productIds = products.map(p => p._id);
 
-    // ✨ NEW: Fetch pending orders for Soft Allocation
-    const Order = require('../models/Order');
+    // ✨ 1. Fetch pending orders for Soft Allocation
     const liveOrders = await Order.find({
       status: { $in: ['Placed', 'Confirmed', 'Editing'] }
     }).select('items').lean();
 
-    const globalAllocations = {}; 
-    const batchAllocations = {};  
+    const globalAllocations = {};
+    const batchAllocations = {};
 
     liveOrders.forEach(order => {
       if (!order.items) return;
@@ -36,6 +132,33 @@ exports.getProductsWithBatches = async (req, res) => {
       });
     });
 
+    // ✨ 2. SECURE SALES DICTIONARY (For Client Top Products)
+    // We strictly pull ONLY the volume sold this month. No revenue. No client names.
+    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+
+    const monthlySales = await SalesInvoice.aggregate([
+      { $match: { invoiceDate: { $gte: startOfMonth }, invoiceStatus: { $ne: 'CANCELLED' } } },
+      { $unwind: '$items' },
+      { $group: { _id: '$items.productId', sold: { $sum: '$items.billedQty' } } },
+      { $sort: { sold: -1 } } // ✨ Sort highest sales first
+    ]);
+
+    // Convert the sales array into a fast lookup dictionary { "productId": 500 }
+    // const salesDict = {};
+    // monthlySales.forEach(sale => {
+    //   if (sale._id) {
+    //     salesDict[String(sale._id)] = sale.sold;
+    //   }
+    // });
+
+    const rankDict = {};
+    monthlySales.forEach((sale, index) => {
+      if (sale._id) {
+        rankDict[String(sale._id)] = index + 1; // Assigns 1st, 2nd, 3rd place
+      }
+    });
+
+    // ✨ 3. Build the final Catalog Payload
     const enriched = await Promise.all(
       products.map(async (product) => {
         const pIdStr = String(product._id);
@@ -45,7 +168,6 @@ exports.getProductsWithBatches = async (req, res) => {
 
         const batchList = batches.map(b => {
           const reservedInBatch = batchAllocations[String(b._id)] || 0;
-          // ✨ Soft Allocation: Subtract pending orders from the batch stock
           const virtualBatchStock = Math.max(0, (b.totalStockQuantity || 0) - reservedInBatch);
 
           return {
@@ -53,12 +175,11 @@ exports.getProductsWithBatches = async (req, res) => {
             no: b.batchNumber,
             mrp: b.mrp,
             expiry: b.expiryDate ? b.expiryDate.toISOString().split('T')[0] : '',
-            stock: virtualBatchStock, 
+            stock: virtualBatchStock,
             offer: b.offer?.isActive ? b.offer : null,
           };
         });
 
-        // ✨ Soft Allocation: Subtract pending orders from the global stock
         const totalReserved = globalAllocations[pIdStr] || 0;
         const virtualTotalStock = Math.max(0, (product.totalStock || 0) - totalReserved);
 
@@ -68,7 +189,7 @@ exports.getProductsWithBatches = async (req, res) => {
           : 0;
 
         return {
-          productId: product._id, // ✨ FIXED: Maps perfectly to the Cart now!
+          productId: product._id,
           name: product.name,
           company: product.company,
           companyShortCode: product.companyId ? product.companyId.shortCode : product.company,
@@ -83,10 +204,14 @@ exports.getProductsWithBatches = async (req, res) => {
           mrp: product.mrp || 0,
           photoUrl: (product.images && product.images.length > 0) ? product.images[0] : (product.photoUrl || ''),
           images: product.images || [],
-          defaultRate: computedRate,    
+          defaultRate: computedRate,
           batches: batchList,
-          
-          totalStock: virtualTotalStock, // Sends the Soft Allocated stock to the frontend!
+
+          totalStock: virtualTotalStock,
+
+          salesRank: rankDict[pIdStr] || 999999,
+          // sold: salesDict[pIdStr] || 0,
+
           shortExpiryThreshold: product.shortExpiryThreshold || 90,
           lowStockThreshold: product.lowStockThreshold || 50,
           criticalStockThresholdPercent: product.criticalStockThresholdPercent || 50,
@@ -208,16 +333,16 @@ exports.updateBatchPTR = async (req, res) => {
 
     // Establish boundaries
     const maxPtr = batch.mrp * 0.8;
-    const latestPurchaseRate = batch.purchaseLots?.length > 0 
-      ? batch.purchaseLots[batch.purchaseLots.length - 1].purchaseRate 
+    const latestPurchaseRate = batch.purchaseLots?.length > 0
+      ? batch.purchaseLots[batch.purchaseLots.length - 1].purchaseRate
       : 0;
 
     // Validate
     if (numPTR > maxPtr) {
-        return res.status(400).json({ message: `PTR (₹${numPTR}) cannot exceed 80% of MRP (₹${maxPtr.toFixed(2)}).` });
+      return res.status(400).json({ message: `PTR (₹${numPTR}) cannot exceed 80% of MRP (₹${maxPtr.toFixed(2)}).` });
     }
     if (numPTR < latestPurchaseRate) {
-        return res.status(400).json({ message: `PTR (₹${numPTR}) cannot be less than Purchase Cost (₹${latestPurchaseRate}).` });
+      return res.status(400).json({ message: `PTR (₹${numPTR}) cannot be less than Purchase Cost (₹${latestPurchaseRate}).` });
     }
 
     // Apply and Save
@@ -303,7 +428,7 @@ exports.getOffersList = async (req, res) => {
   try {
     const { status = 'all', months = '6' } = req.query;
     const now = new Date();
-    
+
     let matchQuery = { totalStockQuantity: { $gt: 0 } };
 
     if (months !== 'all') {
@@ -315,13 +440,13 @@ exports.getOffersList = async (req, res) => {
     if (status === 'active') {
       matchQuery['offer.isActive'] = true;
       matchQuery['offer.startDate'] = { $lte: now };
-    } 
+    }
     else if (status === 'inactive') {
       matchQuery.$or = [
-        { 'offer.isActive': false, 'offer.description': { $ne: '' } }, 
-        { 'offer.isActive': true, 'offer.startDate': { $gt: now } } 
+        { 'offer.isActive': false, 'offer.description': { $ne: '' } },
+        { 'offer.isActive': true, 'offer.startDate': { $gt: now } }
       ];
-    } 
+    }
     else if (status === 'no_offer') {
       matchQuery.$or = [
         { offer: { $exists: false } },
@@ -335,11 +460,11 @@ exports.getOffersList = async (req, res) => {
     // Inside getOffersList...
     const batches = await Batch.find(matchQuery)
       .populate('companyId', 'shortCode')
-      .populate('productId') 
+      .populate('productId')
       .lean();
 
     const formatted = batches.map(b => {
-      const prod = b.productId || {}; 
+      const prod = b.productId || {};
       return {
         id: b._id,
         productId: prod._id || b.productId,
@@ -352,14 +477,14 @@ exports.getOffersList = async (req, res) => {
         mrp: b.mrp,
         sellingRate: b.sellingRate,
         offer: b.offer?.description ? b.offer : null,
-        
+
         photoUrl: (prod.images && prod.images.length > 0) ? prod.images[0] : (prod.photoUrl || ''),
         images: prod.images || [],
         packing: prod.packing,
         type: prod.type,
-        categories: prod.categories || [],      
-        compositions: prod.compositions || [],  
-        hsnCode: prod.hsnCode,                  
+        categories: prod.categories || [],
+        compositions: prod.compositions || [],
+        hsnCode: prod.hsnCode,
         gstRate: prod.gstRate,
         description: prod.description,
         usageTips: prod.usageTips,
@@ -412,8 +537,8 @@ exports.updateBatchOffer = async (req, res) => {
           const lastToggle = new Date(batch.offer.lastToggleDate);
           const today = new Date();
           if (lastToggle.toDateString() === today.toDateString()) {
-            return res.status(400).json({ 
-              message: `The offer for batch ${batch.batchNumber} was already toggled today. Limit: 1 toggle/day per batch.` 
+            return res.status(400).json({
+              message: `The offer for batch ${batch.batchNumber} was already toggled today. Limit: 1 toggle/day per batch.`
             });
           }
         }
@@ -429,10 +554,10 @@ exports.updateBatchOffer = async (req, res) => {
     // ✨ NEW: Broadcast Notification to all active clients
     if (notifyClients && offer.isActive) {
       // ✨ FIX: Look for both 'Active' and 'Approved' (case-insensitive)
-      const activeClients = await Client.find({ 
-        status: { $regex: /^(approved|active|Static|Credit Alert)$/i } 
+      const activeClients = await Client.find({
+        status: { $regex: /^(approved|active|Static|Credit Alert)$/i }
       }).select('_id');
-      
+
       const notifications = activeClients.map(client => ({
         recipientId: client._id,
         recipientRole: 'client',

@@ -145,7 +145,7 @@ const ProductCard = ({ product, canOrder, onView, onAddToOrder, onAddToInquiry, 
   return (
     <div className={`rounded-2xl border overflow-hidden flex flex-col transition-colors ${cardThemeClasses} ${outOfStock ? 'opacity-70' : ''}`}>
       <button onClick={() => onView(product)} className="block w-full relative">
-        <div className="aspect-[5/4] bg-slate-100 flex items-center justify-center relative overflow-hidden">
+        <div className="aspect-[5/5] bg-slate-100 flex items-center justify-center relative overflow-hidden">
 
           {displayImageUrl ? (
             <img src={displayImageUrl} alt={product.name} className="w-full h-full object-cover" />
