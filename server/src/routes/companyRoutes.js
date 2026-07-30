@@ -13,8 +13,10 @@ const {
 router.get('/', getAllCompanies);
 router.post('/', createCompany);
 
+
 // GET /api/companies/:id        -> single supplier (360° view)
 // PUT /api/companies/:id        -> update supplier profile
+router.get('/public', getAllCompanies);
 router.get('/:id', getCompanyById);
 router.put('/:id', updateCompany);
 

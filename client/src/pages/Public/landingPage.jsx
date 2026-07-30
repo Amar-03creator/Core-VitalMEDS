@@ -1,18 +1,19 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Pill, ShieldCheck, Zap, TrendingUp, Package,
   ChevronRight, Star, CheckCircle, Phone, Mail,
   Clock, IndianRupee, FileText, Truck, Users,
-  ArrowRight, Menu, X, Sparkles
+  ArrowRight, Menu, X, Sparkles, BookOpen
 } from 'lucide-react';
+import { api } from '../../services/api'; // Adjust path if needed to your base api service
 
-/* ── DEMO STATS ── */
+/* ── STATS ── */
 const stats = [
-  { value: '120+', label: 'Partner Pharmacies' },
-  { value: '₹2Cr+', label: 'Monthly Distribution' },
-  { value: '1400+', label: 'Products Listed' },
-  { value: '99.2%', label: 'Order Accuracy' },
+  { value: '50+', label: 'Partner Pharmacies' },
+  { value: '5 LAKH+', label: 'Monthly Distribution' },
+  { value: '140+', label: 'Products Listed' },
+  { value: '99%', label: 'Order Accuracy' },
 ];
 
 const features = [
@@ -58,7 +59,7 @@ const steps = [
   {
     step: '01',
     title: 'Register & Get Verified',
-    desc: 'Submit your Drug License and GSTIN. Our team reviews and approves within 24 hours.',
+    desc: 'Submit your documents like DL, GSTIN, Aadhaar, PAN. Our team reviews and approves within 24 hours.',
     color: 'text-emerald-400',
   },
   {
@@ -70,7 +71,7 @@ const steps = [
   {
     step: '03',
     title: 'Accept Quote & Receive',
-    desc: 'Review the distributor\'s pricing, accept the quote, and get delivery at your doorstep.',
+    desc: 'Review the distributor\'s pricing, accept the quote, and get delivery at your pharmacy.',
     color: 'text-violet-400',
   },
 ];
@@ -82,11 +83,28 @@ const tiers = [
   { name: 'Diamond', threshold: '₹2L+/mo', perks: ['Best rates + free goods', 'Flexible credit', 'Same-day dispatch'], color: 'border-cyan-300 bg-cyan-50', badge: 'bg-cyan-100 text-cyan-700', highlight: true },
 ];
 
-const companies = ['Cipla', 'Sun Pharma', "Dr. Reddy's", 'Mankind', 'Torrent', 'USV', 'Alkem', 'Aster', 'Sanofi', 'Macleods'];
-
-/* ── COMPONENT ── */
 const LandingPage = () => {
-  const [menuOpen, setMenuOpen] = useState(false);
+  const navigate = useNavigate();
+  const [companies, setCompanies] = useState([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(true);
+  const [showHowItWorksModal, setShowHowItWorksModal] = useState(false);
+
+  // Fetch registered companies dynamically from DB schema
+  useEffect(() => {
+    const fetchCompanies = async () => {
+      try {
+        const res = await api.getPublicCompanies(); // ✨ Call the new public API
+        const companyList = res?.data || res || [];
+        setCompanies(companyList.map(c => c.companyName || c.name || c));
+      } catch (err) {
+        console.error('Failed to fetch companies dynamically, using fallback', err);
+        setCompanies(['Cipla', 'Sun Pharma', "Dr. Reddy's", 'Mankind', 'Torrent', 'USV', 'Alkem', 'Aster', 'Sanofi', 'Macleods']);
+      } finally {
+        setLoadingCompanies(false);
+      }
+    };
+    fetchCompanies();
+  }, []);
 
   return (
     <div className="min-h-screen bg-white overflow-x-hidden">
@@ -117,12 +135,9 @@ const LandingPage = () => {
 
       {/* ── HERO ── */}
       <section className="bg-slate-900 px-4 pt-12 pb-16 relative overflow-hidden">
-        {/* Background decoration */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-24 -right-24 w-64 h-64 rounded-full bg-emerald-500/10 blur-3xl" />
           <div className="absolute -bottom-12 -left-12 w-48 h-48 rounded-full bg-blue-500/10 blur-3xl" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full bg-slate-700/30 blur-3xl" />
-          {/* Grid pattern */}
           <svg className="absolute inset-0 w-full h-full opacity-[0.03]" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
@@ -134,23 +149,20 @@ const LandingPage = () => {
         </div>
 
         <div className="relative max-w-2xl mx-auto">
-          {/* Badge */}
           <div className="inline-flex items-center gap-2 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold px-3 py-1.5 rounded-full mb-6">
             <Sparkles size={12} />
             Odisha's Trusted Pharma Distributor
           </div>
 
-          {/* Headline */}
           <h1 className="text-white text-4xl font-black leading-tight tracking-tight mb-4">
             The Smarter Way to
             <span className="block text-emerald-400">Order Medicines</span>
           </h1>
 
           <p className="text-slate-400 text-base leading-relaxed mb-8 max-w-sm">
-            VitalMEDS connects pharmacies in Odisha directly with Mila Agencies,  with real-time stock, custom pricing, and GST-compliant invoicing.
+            CoreVital MEDS connects pharmacies in Odisha directly with Mila Agencies, with real-time stock, custom pricing, and GST-compliant invoicing.
           </p>
 
-          {/* CTAs */}
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link to="/register"
               className="flex items-center justify-center gap-2 bg-emerald-500 text-white font-bold py-3.5 px-6 rounded-2xl text-base shadow-xl shadow-emerald-500/30 hover:bg-emerald-400 transition-all active:scale-95">
@@ -179,7 +191,6 @@ const LandingPage = () => {
             </div>
           </div>
 
-          {/* Trust line */}
           <p className="text-slate-500 text-xs mt-5 flex items-center gap-2">
             <ShieldCheck size={13} className="text-emerald-500" />
             KYC verified · GST compliant · Drug License required
@@ -277,7 +288,7 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* ── PARTNER COMPANIES ── */}
+      {/* ── PARTNER COMPANIES (DYNAMIC) ── */}
       <section className="px-4 py-10 bg-white max-w-2xl mx-auto">
         <p className="text-slate-400 text-xs font-bold uppercase tracking-widest text-center mb-6">Stocking Products From</p>
         <div className="flex flex-wrap gap-2 justify-center">
@@ -297,7 +308,7 @@ const LandingPage = () => {
         </div>
         <div className="relative max-w-2xl mx-auto text-center">
           <h2 className="text-white text-2xl font-black leading-tight mb-2">Ready to streamline<br />your pharmacy orders?</h2>
-          <p className="text-emerald-100 text-sm mb-6">Join 120+ pharmacies already using VitalMEDS.</p>
+          <p className="text-emerald-100 text-sm mb-6">Join 50+ pharmacies already using CoreVital MEDS.</p>
           <div className="flex flex-col gap-3">
             <Link to="/register"
               className="flex items-center justify-center gap-2 bg-white text-emerald-600 font-black py-3.5 rounded-2xl text-base shadow-xl">
@@ -320,7 +331,7 @@ const LandingPage = () => {
               <Pill size={14} className="text-white" />
             </div>
             <div>
-              <p className="text-white font-bold text-sm leading-none">VitalMEDS</p>
+              <p className="text-white font-bold text-sm leading-none">CoreVital MEDS</p>
               <p className="text-slate-500 text-[10px]">by Mila Agencies, Odisha</p>
             </div>
           </div>
@@ -328,9 +339,9 @@ const LandingPage = () => {
           <div className="grid grid-cols-2 gap-6 mb-6">
             <div>
               <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2.5">Platform</p>
-              {['Register', 'Sign In', 'Browse Products', 'How It Works'].map(l => (
-                <p key={l} className="text-slate-500 text-sm py-0.5">{l}</p>
-              ))}
+              <Link to="/register" className="block text-slate-500 text-sm py-0.5 hover:text-white transition-colors">Register</Link>
+              <Link to="/login" className="block text-slate-500 text-sm py-0.5 hover:text-white transition-colors">Sign In</Link>
+              <button onClick={() => setShowHowItWorksModal(true)} className="block text-left text-slate-500 text-sm py-0.5 hover:text-white transition-colors">How It Works</button>
             </div>
             <div>
               <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2.5">Contact</p>
@@ -349,11 +360,50 @@ const LandingPage = () => {
           </div>
 
           <div className="border-t border-slate-700/50 pt-4 flex flex-col gap-1">
-            <p className="text-slate-600 text-xs">© 2025 Mila Agencies. All rights reserved.</p>
+            <p className="text-slate-600 text-xs">© 2026 Mila Agencies. All rights reserved.</p>
             <p className="text-slate-700 text-xs">Drug License No. XX-XXXX-XXX | GSTIN: 21XXXXX</p>
           </div>
         </div>
       </footer>
+
+      {/* ── HOW IT WORKS QUICK MODAL ── */}
+      {showHowItWorksModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-6 space-y-6 shadow-2xl relative animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                <BookOpen size={20} className="text-emerald-600" /> How Ordering Works
+              </h3>
+              <button onClick={() => setShowHowItWorksModal(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
+                <X size={18} />
+              </button>
+            </div>
+            
+            <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <h4 className="font-bold text-slate-900 mb-1">1. Verification Requirement</h4>
+                <p>Register with your credentials. Submit documents like DL, GSTIN, Aadhaar, PAN. Once verified by admin, you gain full direct ordering capabilities.</p>
+              </div>
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <h4 className="font-bold text-slate-900 mb-1">2. Inquiries & Custom Quotes</h4>
+                <p>Add products to your cart and request a quote. Review distributor pricing, accept quotes, and convert them to orders seamlessly.</p>
+              </div>
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <h4 className="font-bold text-slate-900 mb-1">3. Direct Fulfillment</h4>
+                <p>Enjoy quick order edits within the 2-minute placement window before invoicing, and track dispatches straight to your pharmacy.</p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => { setShowHowItWorksModal(false); navigate('/register'); }}
+              className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-emerald-500/20"
+            >
+              Get Started Now
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

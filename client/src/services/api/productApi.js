@@ -9,10 +9,17 @@
  */
 
 // client/src/services/api/productApi.js
-import { secureFetch } from './apiCore';
+import { secureFetch,BASE_URL } from './apiCore';
 
 export const productApi = {
   /* ── Companies ────────────────────────────────────────────────────────── */
+  async getPublicCompanies() {
+    // We use standard 'fetch' here instead of 'secureFetch' so no token is required
+    const res = await fetch(`${BASE_URL}/companies/public`);
+    if (!res.ok) throw new Error('Failed to fetch public companies');
+    return res.json();
+  },
+  
   async getCompanies() {
     const res = await secureFetch(`/companies`);
     if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to fetch companies');
