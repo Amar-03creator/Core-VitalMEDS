@@ -369,3 +369,66 @@ exports.confirmDocumentUpload = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+exports.updateMyContact = async (req, res) => {
+  try {
+    const { email, phone } = req.body;
+    
+    // 1. Find current logged-in client
+    const client = await Client.findOne({ 'contacts.email': new RegExp(`^${req.user.email}$`, 'i') });
+    
+    if (!client) {
+      return res.status(404).json({ message: 'Client profile not found.' });
+    }
+
+    // 2. ✨ DUPLICATE EMAIL CHECK across ALL clients in DB
+    if (email && email.toLowerCase() !== req.user.email.toLowerCase()) {
+      const existingEmail = await Client.findOne({
+        'contacts.email': new RegExp(`^${email.trim()}$`, 'i'),
+        _id: { $ne: client._id } // Ignore self
+      });
+
+      if (existingEmail) {
+        return res.status(400).json({ message: 'This email already exists in the database.' });
+      }
+    }
+
+    // 3. Update the primary contact
+    const primaryIndex = client.contacts.findIndex(c => c.isPrimary);
+    if (primaryIndex >= 0) {
+      if (email) client.contacts[primaryIndex].email = email.trim();
+      if (phone) client.contacts[primaryIndex].phone = phone.replace(/^\+91/, '').replace(/\D/g, '');
+    }
+
+    await client.save();
+    res.json({ success: true, message: 'Contact details updated successfully.' });
+
+  } catch (error) {
+    console.error('[updateMyContact] error:', error);
+    res.status(500).json({ message: error.message || 'Failed to sync contact updates.' });
+  }
+};
+
+// ✨ NEW: Check if email is available BEFORE sending OTP
+exports.precheckContact = async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    // Check if another client is already using this email
+    if (email && email.toLowerCase() !== req.user.email.toLowerCase()) {
+      
+      // ✨ FIX: Removed the duplicate 'contacts.email' key
+      const existingEmail = await Client.findOne({
+        'contacts.email': new RegExp(`^${email.trim()}$`, 'i')
+      });
+
+      if (existingEmail) {
+        return res.status(400).json({ message: 'This email is already associated with another pharmacy.' });
+      }
+    }
+    
+    res.json({ success: true, message: 'Email is available.' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error verifying email availability.' });
+  }
+};

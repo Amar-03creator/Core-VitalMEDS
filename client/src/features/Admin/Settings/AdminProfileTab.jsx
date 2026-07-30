@@ -1,4 +1,4 @@
-// features/Admin/Settings/AdminProfileTab.jsx
+// features/Admin/Profile/AdminProfileTab.jsx
 import { useState } from 'react';
 import { Lock, Pencil, X, Check } from 'lucide-react';
 import { toast } from 'sonner';
@@ -6,10 +6,11 @@ import { toast } from 'sonner';
 const AdminProfileTab = ({ admin, authAxios, onUpdated }) => {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  
+  // Phone is removed from state!
   const [form, setForm] = useState({
     name: admin.name || '',
     secondaryEmail: admin.secondaryEmail || '',
-    phone: admin.phone || '',
     address: admin.address || '',
   });
 
@@ -17,7 +18,6 @@ const AdminProfileTab = ({ admin, authAxios, onUpdated }) => {
     setForm({
       name: admin.name || '',
       secondaryEmail: admin.secondaryEmail || '',
-      phone: admin.phone || '',
       address: admin.address || '',
     });
     setEditing(true);
@@ -85,16 +85,7 @@ const AdminProfileTab = ({ admin, authAxios, onUpdated }) => {
       </div>
 
       {field('Full Name', 'name')}
-
-      <div>
-        <label className="text-slate-500 text-sm font-medium flex items-center gap-1.5">
-          Login Email <Lock size={12} className="text-slate-400" />
-        </label>
-        <p className="text-slate-900 text-base font-medium mt-1">{admin.email}</p>
-      </div>
-
       {field('Secondary Email', 'secondaryEmail', { type: 'email' })}
-      {field('Phone', 'phone')}
       {field('Address', 'address')}
     </div>
   );

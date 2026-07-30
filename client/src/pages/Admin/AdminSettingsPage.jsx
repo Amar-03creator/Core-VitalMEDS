@@ -1,18 +1,19 @@
 // pages/Admin/AdminSettingsPage.jsx
 import { useState, useEffect, useCallback } from 'react';
-import { UserCircle2, ScrollText, FileStack } from 'lucide-react';
+import { UserCircle2, ScrollText, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
 
+
 import AdminProfileTab from '../../features/Admin/Settings/AdminProfileTab';
-import LegalInfoTab from '../../features/Admin/Settings/LegalInfoTab';
-import DocumentRequestsTab from '../../features/Admin/Settings/DocumentRequestsTab';
+import LegalInfoTab from '../../features/Admin/Settings/LegalInfoTab'; 
+import AdminSecurityTab from '../../features/Admin/Settings/AdminSecurityTab';
 
 const TABS = [
   { key: 'profile', label: 'Profile', icon: UserCircle2 },
   { key: 'legal', label: 'Legal', icon: ScrollText },
-  { key: 'documents', label: 'Doc Requests', icon: FileStack },
+  { key: 'security', label: 'Security', icon: ShieldCheck },
 ];
 
 const AdminSettingsPage = () => {
@@ -71,7 +72,7 @@ const AdminSettingsPage = () => {
 
       {activeTab === 'profile' && <AdminProfileTab admin={admin} authAxios={authAxios} onUpdated={fetchAdmin} />}
       {activeTab === 'legal' && <LegalInfoTab admin={admin} authAxios={authAxios} onUpdated={fetchAdmin} />}
-      {activeTab === 'documents' && <DocumentRequestsTab authAxios={authAxios} />}
+      {activeTab === 'security' && <AdminSecurityTab admin={admin} />}
 
       <div className="h-2" />
     </div>

@@ -1,5 +1,6 @@
+// client/src/context/AuthContext.jsx
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { CognitoUserPool, CognitoUser, AuthenticationDetails } from 'amazon-cognito-identity-js';
+import { CognitoUserPool, CognitoUser, AuthenticationDetails, CognitoUserAttribute } from 'amazon-cognito-identity-js';
 import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -15,7 +16,7 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
-  const [role, setRole] = useState(null); // ✨ RESTORED: This was missing!
+  const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const authAxios = axios.create({ baseURL: API_BASE_URL });
@@ -52,7 +53,7 @@ export const AuthProvider = ({ children }) => {
       );
       
       setUser(data.profile);
-      setRole(data.role); // ✨ RESTORED: Update the role in state
+      setRole(data.role); 
       
       if (data.role === 'client' && data.profile && data.profile._id) {
         localStorage.setItem('clientId', data.profile._id);
@@ -129,6 +130,63 @@ export const AuthProvider = ({ children }) => {
     });
   };
 
+  // ✨ NEW: Change Password Handler
+  const changePassword = (oldPassword, newPassword) => {
+    return new Promise((resolve, reject) => {
+      const cognitoUser = userPool.getCurrentUser();
+      if (!cognitoUser) return reject(new Error("No active session. Please log in again."));
+      
+      cognitoUser.getSession((err) => {
+        if (err) return reject(err);
+        cognitoUser.changePassword(oldPassword, newPassword, (err, result) => {
+          if (err) reject(err);
+          else resolve(result);
+        });
+      });
+    });
+  };
+
+  // ✨ NEW: Update Email/Phone in Cognito
+  const updateCognitoContact = (email, phone) => {
+    return new Promise((resolve, reject) => {
+      const cognitoUser = userPool.getCurrentUser();
+      if (!cognitoUser) return reject(new Error("No active session. Please log in again."));
+      
+      cognitoUser.getSession((err) => {
+        if (err) return reject(err);
+        
+        const attributeList = [];
+        if (email) attributeList.push(new CognitoUserAttribute({ Name: 'email', Value: email }));
+        if (phone) {
+          const formattedPhone = phone.startsWith('+91') ? phone : `+91${phone.replace(/\D/g, '')}`;
+          attributeList.push(new CognitoUserAttribute({ Name: 'phone_number', Value: formattedPhone }));
+        }
+
+        cognitoUser.updateAttributes(attributeList, (err, result) => {
+          if (err) reject(err);
+          else resolve(result);
+        });
+      });
+    });
+  };
+
+  // ✨ NEW: Verify the 6-digit OTP for email/phone changes
+  const verifyContactOtp = (attributeName, code) => {
+    return new Promise((resolve, reject) => {
+      const cognitoUser = userPool.getCurrentUser();
+      if (!cognitoUser) return reject(new Error("No active session. Please log in again."));
+      
+      cognitoUser.getSession((err) => {
+        if (err) return reject(err);
+        
+        cognitoUser.verifyAttribute(attributeName, code, {
+          onSuccess: (result) => resolve(result),
+          onFailure: (err) => reject(err),
+        });
+      });
+    });
+  };
+
   const logout = useCallback(() => {
     try {
       const cognitoUser = userPool.getCurrentUser();
@@ -140,7 +198,7 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setUser(null);
       setToken(null);
-      setRole(null); // ✨ Clear the role on logout
+      setRole(null); 
       localStorage.clear();
       sessionStorage.clear();
       window.location.replace('/login');
@@ -151,7 +209,13 @@ export const AuthProvider = ({ children }) => {
     <AuthContext.Provider value={{
       user, role, token, loading,
       login, logout, completeNewPassword, authAxios,
-      isAuthenticated: !!token && !!user && !!role, // ✨ Strict check
+      
+      // ✨ EXPOSED THE NEW FUNCTIONS HERE
+      changePassword, 
+      updateCognitoContact, 
+      verifyContactOtp,
+      
+      isAuthenticated: !!token && !!user && !!role, 
     }}>
       {children}
     </AuthContext.Provider>

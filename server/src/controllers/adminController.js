@@ -294,3 +294,38 @@ exports.generateInviteCode = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+/* ── POST /api/admin/me/contact/precheck ────────────────────────────── */
+exports.precheckAdminContact = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (email && email.toLowerCase() !== req.user.email.toLowerCase()) {
+      const existingAdmin = await Admin.findOne({ email: new RegExp(`^${email.trim()}$`, 'i') });
+      if (existingAdmin) {
+        return res.status(400).json({ message: 'This email is already in use by another admin.' });
+      }
+    }
+    res.json({ success: true, message: 'Email is available.' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error verifying email availability.' });
+  }
+};
+
+/* ── PUT /api/admin/me/contact ──────────────────────────────────────── */
+exports.updateAdminContact = async (req, res) => {
+  try {
+    const { email, phone } = req.body;
+    const admin = await findSelfAdmin(req);
+    
+    if (!admin) return res.status(404).json({ message: 'Admin profile not found.' });
+
+    if (email) admin.email = email.trim();
+    if (phone) admin.phone = phone.replace(/^\+91/, '').replace(/\D/g, '');
+
+    await admin.save();
+    res.json({ success: true, message: 'Contact details updated successfully.' });
+  } catch (error) {
+    console.error('[updateAdminContact] error:', error);
+    res.status(500).json({ message: error.message || 'Failed to sync contact updates.' });
+  }
+};

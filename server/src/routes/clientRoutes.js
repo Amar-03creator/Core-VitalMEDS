@@ -27,6 +27,8 @@ const {
 const {
   getMyProfile,
   updateMyProfile,
+  updateMyContact,
+  precheckContact,
   requestDocumentUpload,
   getDocumentUploadTicket,
   confirmDocumentUpload,
@@ -46,6 +48,8 @@ router.put('/me', authenticate, authorize('client'), updateMyProfile);
 router.post('/me/documents/request', authenticate, authorize('client'), requestDocumentUpload);
 router.get('/me/documents/upload-ticket', authenticate, authorize('client'), getDocumentUploadTicket);
 router.post('/me/documents/confirm', authenticate, authorize('client'), confirmDocumentUpload);
+router.put('/me/contact', authenticate, authorize('client'), updateMyContact);
+router.post('/me/contact/precheck', authenticate, authorize('client'), precheckContact); // ✨ ADD ROUTE
 
 // ── Single client ──────────────────────────────────────────────────────
 router.get('/:id', authenticate, authorize('admin', 'client'), getClientById);
