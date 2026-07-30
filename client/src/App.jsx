@@ -1,7 +1,7 @@
 // src/App.jsx
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
-import PublicRoute from './components/PublicRoute'; // ✨ IMPORTED
+import PublicRoute from './components/PublicRoute';
 import { Toaster } from 'sonner';
 
 // 1. IMPORT THE DATA PROVIDERS
@@ -13,13 +13,12 @@ import LandingPage from './pages/Public/landingPage';
 import LoginPage from './pages/Public/LoginPage';
 import RegisterPage from './pages/Public/RegistrationPage';
 import TermsOfService from './pages/Public/TermsOfService';
-import PrivacyPolicy from './pages/Public/PrivacyPolicy'
+import PrivacyPolicy from './pages/Public/PrivacyPolicy';
 
 // Client
 import ClientLayout from './layouts/ClientLayout/ClientLayout';
 import ClientDashboard from './pages/Client/ClientDashboard';
 import ClientProductsPage from './pages/Client/ClientProductsPage';
-import ClientInquiryPage from './pages/Client/ClientInquiryPage';
 import ClientOrdersPage from './pages/Client/ClientOrdersPage';
 import ClientBillingPage from './pages/Client/ClientBillingPage';
 import ClientSupportPage from './pages/Client/ClientSupportPage';
@@ -27,7 +26,8 @@ import ClientNotificationsPage from './pages/Client/ClientNotificationsPage';
 import ClientQuickReorderPage from './pages/Client/ClientQuickReorderPage';
 import ClientCart from './pages/Client/ClientCart';
 import ClientProfilePage from './pages/Client/ClientProfilePage';
-import ClientOffersPage from './pages/Client/ClientOffersPage'; // ✨ ADDED
+import ClientOffersPage from './pages/Client/ClientOffersPage';
+import HowOrderingWorks from './pages/Client/HowOrderingWorks'; // ✨ ADDED
 
 // Admin
 import AdminLayout from './layouts/AdminLayout/AdminLayout';
@@ -44,7 +44,7 @@ import NotificationsPage from './pages/Admin/NotificationsPage';
 import ExpiryOffersPage from './pages/Admin/OffersPage';
 import AdminSettingsPage from './pages/Admin/AdminSettingsPage';
 import ClaimAccount from './pages/Public/ClaimAccount';
-import ClientGuard from './components/ClientGuard'; // ✨ 
+import ClientGuard from './components/ClientGuard';
 
 function App() {
   return (
@@ -67,19 +67,19 @@ function App() {
               {/* ✨ CLIENT PROTECTED ROUTES (Only accessible to Clients) */}
               <Route element={<ProtectedRoute allowedRoles={['client']} />}>
                 <Route element={<ClientGuard />}>
-                <Route path="/client-dashboard" element={<ClientLayout />}>
-                  <Route index element={<ClientDashboard />} />
-                  <Route path="products" element={<ClientProductsPage />} />
-                  <Route path="inquiry" element={<ClientInquiryPage />} />
-                  <Route path="orders" element={<ClientOrdersPage />} />
-                  <Route path="billing" element={<ClientBillingPage />} />
-                  <Route path="support" element={<ClientSupportPage />} />
-                  <Route path="notifications" element={<ClientNotificationsPage />} />
-                  <Route path="quick-reorder" element={<ClientQuickReorderPage />} />
-                  <Route path="cart" element={<ClientCart />} />
-                  <Route path="profile" element={<ClientProfilePage />} />
-                  <Route path="offers" element={<ClientOffersPage />} /> {/* ✨ ADDED */}
-                </Route>
+                  <Route path="/client-dashboard" element={<ClientLayout />}>
+                    <Route index element={<ClientDashboard />} />
+                    <Route path="products" element={<ClientProductsPage />} />
+                    <Route path="orders" element={<ClientOrdersPage />} />
+                    <Route path="billing" element={<ClientBillingPage />} />
+                    <Route path="support" element={<ClientSupportPage />} />
+                    <Route path="notifications" element={<ClientNotificationsPage />} />
+                    <Route path="quick-reorder" element={<ClientQuickReorderPage />} />
+                    <Route path="cart" element={<ClientCart />} />
+                    <Route path="profile" element={<ClientProfilePage />} />
+                    <Route path="offers" element={<ClientOffersPage />} />
+                    <Route path="how-it-works" element={<HowOrderingWorks />} /> {/* ✨ ADDED */}
+                  </Route>
                 </Route>
               </Route>
 
