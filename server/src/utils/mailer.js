@@ -1,9 +1,9 @@
 // server/src/utils/mailer.js
 const nodemailer = require('nodemailer');
-const aws = require('aws-sdk'); // Install this: npm install aws-sdk nodemailer
+const { SESClient, SendRawEmailCommand } = require('@aws-sdk/client-ses'); // ✨ FIX: Modern SDK v3
 
-// AWS SES Configuration (Will use IAM roles/ENV vars when deployed)
-const ses = new aws.SES({ apiVersion: '2010-12-01', region: process.env.AWS_REGION || 'ap-south-1' });
+// ✨ FIX: Create the v3 SES Client
+const sesClient = new SESClient({ region: process.env.AWS_REGION || 'ap-south-1' });
 
 const sendMail = async (to, subject, html) => {
     const mailOptions = {
@@ -15,12 +15,18 @@ const sendMail = async (to, subject, html) => {
 
     try {
         if (process.env.USE_AWS_SES === 'true') {
-            // Production AWS SES Transport
-            const transporter = nodemailer.createTransport({ SES: ses });
+            // ✨ FIX: Production AWS SES Transport mapped for Nodemailer v9+
+            const transporter = nodemailer.createTransport({ 
+                SES: { 
+                    ses: sesClient, 
+                    aws: { SendRawEmailCommand } 
+                } 
+            });
+            
             await transporter.sendMail(mailOptions);
             console.log(`[AWS SES] Email successfully sent to ${to}`);
         } else {
-            // 🚀 DEV OVERRIDE: If AWS isn't set up yet, throw a fake error to trigger the console fallback
+            // 🚀 DEV OVERRIDE
             throw new Error("AWS SES not configured. Triggering Dev Fallback.");
         }
     } catch (error) {
