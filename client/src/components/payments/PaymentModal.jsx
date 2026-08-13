@@ -5,6 +5,8 @@ import { api } from '../../services/api';
 import { toast } from 'sonner';
 import { PaymentSuccessModal } from './PaymentSuccessModal';
 import { usePersistentModal } from '../../hooks/usePersistentModal';
+import { useGridNavigation } from '../../hooks/useGridNavigation';
+import { useRef } from 'react';
 
 const today = () => new Date().toISOString().split('T')[0];
 
@@ -54,6 +56,9 @@ export const PaymentModal = ({
   const [clients, setClients] = useState([]);
   const [saving, setSaving] = useState(false);
   const [savedReceipt, setSavedReceipt] = useState(null);
+  const modalRef = useRef(null);
+
+  useGridNavigation(modalRef, '.nav-input');
 
   useEffect(() => {
     if (wasRestored) {
@@ -141,8 +146,8 @@ export const PaymentModal = ({
 
   return (
     <>
-      <div className="fixed inset-0 z-[100] bg-black/60 flex items-end">
-        <div className="w-full bg-white rounded-t-3xl max-h-[92vh] overflow-y-auto">
+      <div className="fixed inset-0 z-[100] bg-black/60 flex items-end md:items-center md:justify-center md:p-4 md:pt-[85px]">
+        <div className="w-full md:max-w-2xl bg-white rounded-t-3xl md:rounded-3xl max-h-[92vh] md:max-h-[calc(100vh-100px)] overflow-y-auto shadow-2xl" ref={modalRef}>
           <div className="sticky top-0 bg-white flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100">
             <h3 className="font-bold text-slate-900 text-2xl">
               {editingReceipt ? 'Edit Payment' : 'Record Payment'}
@@ -188,7 +193,7 @@ export const PaymentModal = ({
                     patch({ selectedClient: client || null, amount: '' });
                   }}
                   disabled={!!editingReceipt}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-4 text-lg text-slate-800 outline-none disabled:opacity-50"
+                  className="nav-input w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-4 text-lg text-slate-800 outline-none disabled:opacity-50"
                 >
                   <option value="">Select party...</option>
                   {clients.map(c => (
@@ -211,7 +216,7 @@ export const PaymentModal = ({
                 }}
                 placeholder="0"
                 inputMode="decimal"
-                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-4 text-xl font-bold text-slate-800 outline-none focus:border-emerald-400"
+                className="nav-input w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-4 text-xl font-bold text-slate-800 outline-none focus:border-emerald-400"
               />
             </div>
 
@@ -219,8 +224,13 @@ export const PaymentModal = ({
               <div>
                 <label className="text-lg text-slate-600 block mb-2 font-semibold">Payment Date</label>
                 <input
-                  type="date" value={date} onChange={e => patch({ date: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-4 text-lg text-slate-800 outline-none"
+                  type="date"
+                  value={date}
+                  onChange={e => patch({ date: e.target.value })}
+                  // ✨ FIX: Lock date strictly between client creation and today!
+                  max={today()}
+                  min={selectedClient?.createdAt ? new Date(selectedClient.createdAt).toISOString().split('T')[0] : ''}
+                  className="nav-input w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-4 text-lg text-slate-800 outline-none"
                 />
               </div>
               <div>
@@ -243,7 +253,7 @@ export const PaymentModal = ({
               <input
                 type="text" value={ref} onChange={e => patch({ ref: e.target.value })}
                 placeholder={mode === 'Cash' ? 'RCPT-0025' : 'Ref...'}
-                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-4 text-lg text-slate-800 outline-none focus:border-emerald-400"
+                className="nav-input w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-4 text-lg text-slate-800 outline-none focus:border-emerald-400"
               />
             </div>
 

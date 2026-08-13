@@ -57,6 +57,8 @@ app.use('/api/inquiries', require('./src/routes/inquiryRoutes'));
 app.use('/api/payment-receipts', require('./src/routes/paymentReceiptRoutes'));
 app.use('/api/debit-notes', require('./src/routes/debitNoteRoutes'));
 app.use('/api/billing', require('./src/routes/billingRoutes'));
+app.use('/api/supplier-payments', require('./src/routes/supplierPaymentRoutes'));
+app.use('/api/cart', require('./src/routes/cartRoutes'));
 
 // Analytics & System
 app.use('/api/ledger', require('./src/routes/ledgerRoutes'));
@@ -87,12 +89,13 @@ app.use((err, req, res, next) => {
     });
 });
 
-// ✨ CLOUD FIX: Conditionally start the server
-// If running locally, use app.listen(). If on AWS, skip this so Lambda can manage it.
 if (process.env.NODE_ENV !== 'production') {
     const PORT = process.env.PORT || 5000;
-    app.listen(PORT, () => {
-        console.log(`Local Server is up and running on http://localhost:${PORT}`);
+    const HOST = '0.0.0.0'; // ✨ Allows your mobile phone on the same Wi-Fi to connect
+
+    app.listen(PORT, HOST, () => {
+        console.log(`Local Server is up and running on port ${PORT}`);
+        console.log(`Network access enabled: You can now connect via http://192.168.1.6:${PORT}`);
     });
 }
 

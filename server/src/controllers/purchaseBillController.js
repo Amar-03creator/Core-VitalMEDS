@@ -1,7 +1,11 @@
+// src/controllers/purchaseBillController.js
+
 const mongoose = require('mongoose');
 const PurchaseBill = require('../models/PurchaseBill');
 const Product = require('../models/Product');
 const Batch = require('../models/Batch');
+const Company = require('../models/Company'); 
+const SupplierPayment = require('../models/SupplierPayment'); // ✨ NEW: Needed for the Double Save
 
 exports.createPurchaseBill = async (req, res) => {
     const session = await mongoose.startSession();
@@ -12,7 +16,8 @@ exports.createPurchaseBill = async (req, res) => {
             invoiceNumber, billType, invoiceDate, receivedDate, purchaseType,
             items,
             billDiscountPercent, billDiscountValue, billDiscountType,
-            paymentStatus,
+            // ✨ NEW: Catching the inline payment details from the frontend
+            paymentAmount, paymentMode, referenceNumber, paymentDate, applyAdvance
         } = req.body;
 
         if (!supplierId || !invoiceNumber || !items || items.length === 0) {
@@ -25,25 +30,17 @@ exports.createPurchaseBill = async (req, res) => {
 
         // Validate each item
         for (const item of items) {
-            // Auto-calculate PTR if admin left it blank, otherwise use provided
             const ptr = parseFloat(item.ptr) || (parseFloat(item.mrp) * 0.8);
             const mrp = parseFloat(item.mrp);
             const purchaseRate = parseFloat(item.purchaseRate);
-
             const maxPtr = mrp * 0.8;
 
             if (ptr > maxPtr) {
-                return res.status(400).json({
-                    message: `PTR for ${item.productName || 'item'} (₹${ptr}) cannot exceed 80% of MRP (₹${maxPtr.toFixed(2)}).`
-                });
+                return res.status(400).json({ message: `PTR for ${item.productName || 'item'} (₹${ptr}) cannot exceed 80% of MRP (₹${maxPtr.toFixed(2)}).` });
             }
             if (ptr < purchaseRate) {
-                return res.status(400).json({
-                    message: `PTR for ${item.productName || 'item'} (₹${ptr}) cannot be less than Purchase Rate (₹${purchaseRate.toFixed(2)}).`
-                });
+                return res.status(400).json({ message: `PTR for ${item.productName || 'item'} (₹${ptr}) cannot be less than Purchase Rate (₹${purchaseRate.toFixed(2)}).` });
             }
-
-            // Ensure the validated/calculated PTR is passed down
             item.ptr = ptr;
         }
 
@@ -52,7 +49,6 @@ exports.createPurchaseBill = async (req, res) => {
 
         const processedItems = items.map(item => {
             const gross = item.purchaseRate * item.billedQty;
-
             let lineDiscAmt = 0;
             if (item.discountValue && parseFloat(item.discountValue) > 0) {
                 lineDiscAmt = item.discountType === 'percent'
@@ -60,7 +56,6 @@ exports.createPurchaseBill = async (req, res) => {
                     : parseFloat(item.discountValue);
             }
             const taxable = gross - lineDiscAmt;
-
             let cgst = 0, sgst = 0, igst = 0, gstAmt = 0;
             const cgstPct = parseFloat(item.cgstRate) || 0;
             const sgstPct = parseFloat(item.sgstRate) || 0;
@@ -119,10 +114,11 @@ exports.createPurchaseBill = async (req, res) => {
         } else if (bdAmt > 0) {
             finalBillDiscount = bdAmt;
         }
+        
         const afterBillDiscount = netBeforeDiscount - finalBillDiscount;
-
         const roundedNet = Math.round(afterBillDiscount);
         const roundOff = parseFloat((roundedNet - afterBillDiscount).toFixed(2));
+        const netAmount = roundedNet;
 
         const gstBreakdown = Object.entries(gstSlabMap).map(([rateLabel, data]) => ({
             rateLabel,
@@ -132,11 +128,52 @@ exports.createPurchaseBill = async (req, res) => {
             igst: data.igst || 0,
         }));
 
-        const finalStatus = billType === 'Cash' ? 'PAID' : (paymentStatus || 'UNPAID');
-
         let savedBill;
 
         await session.withTransaction(async () => {
+            const company = await Company.findById(supplierId).session(session);
+            if (!company) throw new Error('Supplier Company not found in ledger');
+
+            let dueForThisBill = netAmount;
+            let paidForThisBill = 0;
+            let advanceConsumed = 0;
+
+            // ✨ 1. Consume Existing Advance (If admin toggled it)
+            if (applyAdvance && company.advancePaid > 0) {
+                advanceConsumed = Math.min(company.advancePaid, dueForThisBill);
+                company.advancePaid -= advanceConsumed;
+                dueForThisBill -= advanceConsumed;
+                paidForThisBill += advanceConsumed;
+            }
+
+            // ✨ 2. Handle New Inline Payment
+            const newPaymentAmt = parseFloat(paymentAmount) || 0;
+            let amountAllocatedFromNewPayment = 0;
+            let leftoverAdvance = 0;
+
+            if (newPaymentAmt > 0) {
+                amountAllocatedFromNewPayment = Math.min(newPaymentAmt, dueForThisBill);
+                leftoverAdvance = newPaymentAmt - amountAllocatedFromNewPayment;
+                
+                dueForThisBill -= amountAllocatedFromNewPayment;
+                paidForThisBill += amountAllocatedFromNewPayment;
+                
+                // Put extra money into the company wallet
+                if (leftoverAdvance > 0) {
+                    company.advancePaid += leftoverAdvance;
+                }
+            }
+
+            // Calculate exact payment status
+            let paymentStatus = 'UNPAID';
+            if (dueForThisBill === 0) paymentStatus = 'PAID';
+            else if (paidForThisBill > 0) paymentStatus = 'PARTIALLY_PAID';
+
+            // Add any remaining debt to the Company Ledger
+            company.totalOutstanding = (company.totalOutstanding || 0) + dueForThisBill;
+            await company.save({ session });
+
+            // ✨ 3. Create the Purchase Bill
             const newBill = new PurchaseBill({
                 supplierName,
                 supplierId,
@@ -152,20 +189,50 @@ exports.createPurchaseBill = async (req, res) => {
                 gstBreakdown,
                 grossAmount: grossTotal,
                 totalGST,
-                netAmount: roundedNet,
+                netAmount,
                 roundOff,
-                paymentStatus: finalStatus,
+                dueAmount: dueForThisBill,
+                paidAmount: paidForThisBill,
+                paymentStatus,
             });
 
             await newBill.save({ session });
 
+            // ✨ 4. DOUBLE SAVE: Generate the formal Payment Voucher in the background
+            if (newPaymentAmt > 0) {
+                // Loophole 3 Fix: Prevent double-logging the exact same UTR
+                if (referenceNumber) {
+                    const existingTxn = await SupplierPayment.findOne({ referenceNumber }).session(session);
+                    if (existingTxn) throw new Error(`Transaction ID ${referenceNumber} has already been logged.`);
+                }
+
+                const dateStr = new Date().toISOString().slice(2, 7).replace('-', '');
+                const lastPayment = await SupplierPayment.findOne({ voucherNumber: new RegExp(`^SPV-${dateStr}`) }).sort({ createdAt: -1 }).session(session);
+                const nextNum = lastPayment ? parseInt(lastPayment.voucherNumber.split('-')[2], 10) + 1 : 1;
+                const voucherNumber = `SPV-${dateStr}-${nextNum.toString().padStart(3, '0')}`;
+
+                const paymentRecord = new SupplierPayment({
+                    voucherNumber,
+                    supplierObjectId: company._id,
+                    paymentDate: paymentDate || new Date(),
+                    paymentMode: paymentMode || 'UPI',
+                    referenceNumber,
+                    totalAmountPaid: newPaymentAmt,
+                    allocatedBills: amountAllocatedFromNewPayment > 0 ? [{
+                        billId: newBill._id,
+                        invoiceNumber: newBill.invoiceNumber,
+                        amountCleared: amountAllocatedFromNewPayment
+                    }] : [],
+                    unallocatedAmount: leftoverAdvance,
+                    adminRemarks: `Inline payment for Bill ${invoiceNumber}`
+                });
+                await paymentRecord.save({ session });
+            }
+
             for (const item of processedItems) {
                 const stockReceived = item.billedQty + (item.freeQty || 0);
-
                 const product = await Product.findById(item.productId).session(session);
-                if (!product) {
-                    throw new Error(`Product not found: ${item.productId}`);
-                }
+                if (!product) throw new Error(`Product not found: ${item.productId}`);
 
                 const lotEntry = {
                     purchaseInvoiceId: newBill._id,
@@ -199,20 +266,13 @@ exports.createPurchaseBill = async (req, res) => {
                             isActive: true,
                         },
                     },
-                    {
-                        upsert: true,
-                        new: true,
-                        session,
-                        returnDocument: 'after',
-                        setDefaultsOnInsert: true,
-                    }
+                    { upsert: true, new: true, session, returnDocument: 'after', setDefaultsOnInsert: true }
                 );
 
                 if (batch && !batch.productName) {
                     batch.productName = product.name;
                     await batch.save({ session });
                 }
-
                 item.batchId = batch._id;
             }
 
@@ -221,26 +281,16 @@ exports.createPurchaseBill = async (req, res) => {
 
             for (const item of processedItems) {
                 const stockReceived = item.billedQty + (item.freeQty || 0);
-                await Product.findByIdAndUpdate(
-                    item.productId,
-                    { $inc: { totalStock: stockReceived } },
-                    { session }
-                );
+                await Product.findByIdAndUpdate(item.productId, { $inc: { totalStock: stockReceived } }, { session });
             }
 
             savedBill = newBill;
         });
 
-        res.status(201).json({
-            message: 'Purchase Bill processed! Inventory updated successfully.',
-            data: savedBill,
-        });
-
+        res.status(201).json({ message: 'Purchase Bill processed! Inventory updated successfully.', data: savedBill });
     } catch (error) {
         console.error('createPurchaseBill error:', error);
-        if (error.code === 11000) {
-            return res.status(409).json({ message: 'An invoice with this number already exists.' });
-        }
+        if (error.code === 11000) return res.status(409).json({ message: 'An invoice with this number already exists.' });
         res.status(500).json({ error: error.message });
     } finally {
         await session.endSession();
@@ -249,127 +299,40 @@ exports.createPurchaseBill = async (req, res) => {
 
 exports.getAllPurchaseBills = async (req, res) => {
     try {
-        const bills = await PurchaseBill.find().sort({ invoiceDate: -1 });
+        const bills = await PurchaseBill.find().populate('supplierId', 'shortCode city').sort({ invoiceDate: -1 });
         res.status(200).json({ success: true, count: bills.length, data: bills });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 };
 
-/* ════════════════════════════════════════════════════════════════════
-   ★ EVERYTHING BELOW THIS LINE IS NEW — appended only, nothing above
-   this comment has been touched. These are new capabilities for the
-   Companies page (supplier-scoped bill list/detail, FIFO payment
-   recording, cancel+restock) that didn't exist before.
-   ════════════════════════════════════════════════════════════════════ */
-
-/* ── getPurchaseBillsBySupplier ───────────────────────────── ★ NEW
-   Powers the "Purchase Bills" tab on the Company Detail page —
-   mirrors api.getSalesInvoices() but scoped to one supplier.       */
 exports.getPurchaseBillsBySupplier = async (req, res) => {
     try {
         const { supplierId } = req.params;
-        const bills = await PurchaseBill.find({ supplierId }).sort({ invoiceDate: -1 });
+        const bills = await PurchaseBill.find({ supplierId }).populate('supplierId', 'shortCode city').sort({ invoiceDate: -1 });
         res.status(200).json({ success: true, count: bills.length, data: bills });
     } catch (error) {
-        console.error('getPurchaseBillsBySupplier error:', error);
         res.status(500).json({ error: error.message });
     }
 };
 
-/* ── getPurchaseBillById ──────────────────────────────────── ★ NEW
-   Powers PurchaseBillDetailModal (mirrors InvoiceDetailModal).      */
 exports.getPurchaseBillById = async (req, res) => {
     try {
         const bill = await PurchaseBill.findById(req.params.id);
         if (!bill) return res.status(404).json({ message: 'Purchase bill not found.' });
         res.status(200).json({ success: true, data: bill });
     } catch (error) {
-        console.error('getPurchaseBillById error:', error);
         res.status(500).json({ error: error.message });
     }
 };
 
-/* ── recordPurchasePayment ────────────────────────────────── ★ NEW
-   FIFO-allocates a payment made TO a supplier against their oldest
-   unpaid bills first. Relies on the NEW dueAmount/paidAmount/
-   paymentHistory fields added to PurchaseBill.js — does not touch
-   or depend on anything inside createPurchaseBill above.
-
-   NOTE: createPurchaseBill (above, untouched) does NOT currently set
-   dueAmount/paidAmount on new bills, so until/unless that's changed,
-   every newly-created bill will have dueAmount: 0 (the schema default)
-   regardless of paymentStatus. This means recordPurchasePayment will
-   find nothing to allocate against for bills created through the
-   existing flow. Flagging this rather than silently "fixing" it by
-   editing createPurchaseBill myself — that function is yours and
-   working; let's discuss before I touch it.                         */
-exports.recordPurchasePayment = async (req, res) => {
-    const session = await mongoose.startSession();
-    try {
-        const { supplierId, amount, datePaid, paymentMode, referenceNumber, adminId } = req.body;
-
-        if (!supplierId || !amount || amount <= 0) {
-            return res.status(400).json({ message: 'supplierId and a positive amount are required.' });
-        }
-
-        let remaining = parseFloat(amount);
-        const allocations = [];
-
-        await session.withTransaction(async () => {
-            const unpaidBills = await PurchaseBill.find({
-                supplierId,
-                isCancelled: { $ne: true },
-                dueAmount: { $gt: 0 },
-            }).sort({ invoiceDate: 1 }).session(session);
-
-            for (const bill of unpaidBills) {
-                if (remaining <= 0) break;
-
-                const amountForThisBill = Math.min(remaining, bill.dueAmount);
-                bill.paidAmount = (bill.paidAmount || 0) + amountForThisBill;
-                bill.dueAmount = Math.max(0, bill.dueAmount - amountForThisBill);
-                bill.paymentStatus = bill.dueAmount === 0 ? 'PAID' : 'PARTIALLY_PAID';
-                bill.paymentHistory.push({ amountPaid: amountForThisBill, datePaid: datePaid || new Date() });
-                bill.updatedBy = adminId;
-
-                await bill.save({ session });
-
-                allocations.push({
-                    invoiceId: bill._id,
-                    invoiceNumber: bill.invoiceNumber,
-                    amountCleared: amountForThisBill,
-                });
-
-                remaining -= amountForThisBill;
-            }
-        });
-
-        res.status(200).json({
-            message: 'Payment recorded and allocated to oldest unpaid bills first.',
-            data: { allocations, unallocatedAmount: remaining, paymentMode, referenceNumber },
-        });
-    } catch (error) {
-        console.error('recordPurchasePayment error:', error);
-        res.status(500).json({ error: error.message });
-    } finally {
-        await session.endSession();
-    }
-};
-
-/* ── cancelPurchaseBill ───────────────────────────────────── ★ NEW
-   Voids a purchase bill and reverses its stock impact. Blocks the
-   cancellation (rather than silently going negative) if any stock
-   from this bill's lots has already been consumed by a sale.        */
 exports.cancelPurchaseBill = async (req, res) => {
     const session = await mongoose.startSession();
     try {
         const { id } = req.params;
         const { reason, adminId } = req.body;
 
-        if (!reason || !reason.trim()) {
-            return res.status(400).json({ message: 'A cancellation reason is required.' });
-        }
+        if (!reason || !reason.trim()) return res.status(400).json({ message: 'A cancellation reason is required.' });
 
         await session.withTransaction(async () => {
             const bill = await PurchaseBill.findById(id).session(session);
@@ -378,42 +341,37 @@ exports.cancelPurchaseBill = async (req, res) => {
 
             for (const item of bill.items) {
                 const stockReceived = item.billedQty + (item.freeQty || 0);
-
                 const batch = await Batch.findById(item.batchId).session(session);
                 if (batch) {
                     const lot = batch.purchaseLots.find(l => String(l.purchaseInvoiceId) === String(bill._id));
                     const consumedFromLot = lot ? (lot.originalQty - lot.remainingQty) : 0;
+                    if (consumedFromLot > 0) throw new Error(`Cannot cancel: ${consumedFromLot} unit(s) of batch ${item.batchNumber} have already been sold.`);
 
-                    if (consumedFromLot > 0) {
-                        throw new Error(
-                            `Cannot cancel: ${consumedFromLot} unit(s) of batch ${item.batchNumber} from this bill have already been sold.`
-                        );
-                    }
-
-                    batch.purchaseLots = batch.purchaseLots.filter(
-                        l => String(l.purchaseInvoiceId) !== String(bill._id)
-                    );
+                    batch.purchaseLots = batch.purchaseLots.filter(l => String(l.purchaseInvoiceId) !== String(bill._id));
                     batch.totalStockQuantity = Math.max(0, batch.totalStockQuantity - stockReceived);
                     await batch.save({ session });
                 }
+                await Product.findByIdAndUpdate(item.productId, { $inc: { totalStock: -stockReceived } }, { session });
+            }
 
-                await Product.findByIdAndUpdate(
-                    item.productId,
-                    { $inc: { totalStock: -stockReceived } },
-                    { session }
-                );
+            const company = await Company.findById(bill.supplierId).session(session);
+            if (company) {
+                company.totalOutstanding = Math.max(0, (company.totalOutstanding || 0) - (bill.dueAmount || 0));
+                company.advancePaid = (company.advancePaid || 0) + (bill.paidAmount || 0);
+                await company.save({ session });
             }
 
             bill.isCancelled = true;
             bill.cancelReason = reason;
             bill.cancelledAt = new Date();
             bill.updatedBy = adminId;
+            bill.dueAmount = 0; 
+            
             await bill.save({ session });
         });
 
         res.status(200).json({ message: 'Purchase bill cancelled and stock reversed.' });
     } catch (error) {
-        console.error('cancelPurchaseBill error:', error);
         res.status(400).json({ message: error.message });
     } finally {
         await session.endSession();

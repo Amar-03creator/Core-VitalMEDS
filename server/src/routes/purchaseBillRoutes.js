@@ -17,9 +17,6 @@ router.get('/', getAllPurchaseBills);
 // GET  /api/purchase-bills/supplier/:supplierId  -> ★ NEW, powers Purchase Bills tab
 router.get('/supplier/:supplierId', getPurchaseBillsBySupplier);
 
-// POST /api/purchase-bills/payments              -> ★ NEW, FIFO payment against a supplier's bills
-router.post('/payments', recordPurchasePayment);
-
 // GET  /api/purchase-bills/:id                   -> ★ NEW, single bill detail
 router.get('/:id', getPurchaseBillById);
 
