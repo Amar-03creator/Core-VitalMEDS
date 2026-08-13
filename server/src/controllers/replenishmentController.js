@@ -1,154 +1,222 @@
+
+
+
 const mongoose = require('mongoose');
 const Product = require('../models/Product');
-const Batch = require('../models/Batch');
-const Company = require('../models/Company');
 const SalesInvoice = require('../models/SalesInvoice');
 
-const STRATEGY_DAYS = {
-    'Last 30 Days Velocity': 30,
-    'Last 60 Days Velocity': 60,
-    'Last 90 Days Velocity': 90,
-};
+const DEFAULT_LOOKBACK_YEARS = 3;
+const MAX_LOOKBACK_YEARS = 5;
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-/* ── generateSuggestions ──────────────────────────────────────
-   Doc section 4.3 / Sub-Tab C:
-   1. Fetch historical SalesInvoice items for the selected product/period.
-   2. Calculate average demand per month (or per multi-year season).
-   3. Subtract current physical stock.
-   4. Suggest an order quantity per product, grouped by supplier if "All Companies".
+// ---------------------------------------------------------------------------
+// helpers
+// ---------------------------------------------------------------------------
 
-   Body params:
-   - supplierId: 'all' | ObjectId
-   - strategy: one of STRATEGY_DAYS keys, or 'Upcoming Season Average'
-   - seasonMonths: [1..12]  (only used for seasonal strategy)
-   - stockCoverMonths: Number  (how many months of stock the suggested qty should cover)
-*/
+function buildProductMatch(companyIds) {
+    const match = {};
+    const ids = Array.isArray(companyIds) ? companyIds : (companyIds ? [companyIds] : []);
+    const wantsAll = ids.length === 0 || ids.includes('all');
+    if (!wantsAll) {
+        match.companyId = { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) };
+    }
+    return match;
+}
+
+function defaultSeasonMonths() {
+    const now = new Date();
+    const months = [];
+    for (let i = 0; i < 3; i++) {
+        months.push(((now.getMonth() + i) % 12) + 1);
+    }
+    return months;
+}
+
+async function computeVelocityDemand(productIds, months) {
+    const since = new Date();
+    since.setMonth(since.getMonth() - months);
+
+    const agg = await SalesInvoice.aggregate([
+        { $match: { invoiceDate: { $gte: since } } },
+        { $unwind: '$items' },
+        { $match: { 'items.productId': { $in: productIds } } },
+        {
+            $group: {
+                _id: '$items.productId',
+                totalQty: { $sum: { $add: ['$items.chargeableQty', '$items.freeQty'] } },
+            },
+        },
+    ]);
+
+    const map = new Map();
+    agg.forEach((row) => {
+        map.set(String(row._id), {
+            totalQty: row.totalQty,
+            perMonth: row.totalQty / months,
+            basis: `Avg of last ${months} months`,
+        });
+    });
+    return map;
+}
+
+async function computeSeasonalDemand(productIds, seasonMonths, lookbackYears) {
+    const currentYear = new Date().getFullYear();
+    const years = [];
+    for (let i = 1; i <= lookbackYears; i++) years.push(currentYear - i);
+
+    const agg = await SalesInvoice.aggregate([
+        { $unwind: '$items' },
+        { $match: { 'items.productId': { $in: productIds } } },
+        {
+            $project: {
+                productId: '$items.productId',
+                qty: { $add: ['$items.chargeableQty', '$items.freeQty'] },
+                month: { $month: '$invoiceDate' },
+                year: { $year: '$invoiceDate' },
+            },
+        },
+        { $match: { month: { $in: seasonMonths }, year: { $in: years } } },
+        {
+            $group: {
+                _id: { productId: '$productId', year: '$year' },
+                yearlyQty: { $sum: '$qty' },
+            },
+        },
+        {
+            $group: {
+                _id: '$_id.productId',
+                totalQty: { $sum: '$yearlyQty' },
+                yearsSeen: { $sum: 1 },
+            },
+        },
+    ]);
+
+    const seasonLabel = seasonMonths.map((m) => MONTH_LABELS[m - 1]).join('-');
+
+    const map = new Map();
+    agg.forEach((row) => {
+        const avgPerSeason = row.totalQty / Math.max(1, row.yearsSeen);
+        map.set(String(row._id), {
+            totalQty: row.totalQty,
+            perMonth: avgPerSeason / seasonMonths.length,
+            basis: `${row.yearsSeen}-yr seasonal avg (${seasonLabel})`,
+        });
+    });
+    return map;
+}
+
+function priorityFor(currentStock, perMonth) {
+    if (currentStock === 0) return 'Critical';
+    if (perMonth > 0 && currentStock < perMonth * 0.5) return 'High';
+    return 'Normal';
+}
+
+// ---------------------------------------------------------------------------
+// main handler
+// ---------------------------------------------------------------------------
+
 exports.generateSuggestions = async (req, res) => {
     try {
-        const { supplierId, strategy, seasonMonths, stockCoverMonths } = req.body;
-        const coverMonths = parseFloat(stockCoverMonths) || 1;
+        const {
+            companyIds,
+            useVelocity = true,
+            useSeasonal = false,
+            velocityMonths,
+            seasonMonths,
+            seasonLookbackYears,
+            stockCoverMonths,
+        } = req.body;
 
-        const productMatch = {};
-        if (supplierId && supplierId !== 'all') {
-            productMatch.companyId = new mongoose.Types.ObjectId(supplierId);
+        if (!useVelocity && !useSeasonal) {
+            return res.status(400).json({ message: "You must evaluate at least one strategy." });
         }
 
+        const coverMonths = parseFloat(stockCoverMonths) || 1;
+        const lookbackYears = Math.min(parseInt(seasonLookbackYears, 10) || DEFAULT_LOOKBACK_YEARS, MAX_LOOKBACK_YEARS);
+        const vMonths = parseInt(velocityMonths, 10) || 2;
+        const sMonths = Array.isArray(seasonMonths) && seasonMonths.length > 0 ? seasonMonths.map(Number) : defaultSeasonMonths();
+
+        const productMatch = buildProductMatch(companyIds);
         const products = await Product.find(productMatch).lean();
         if (products.length === 0) {
             return res.status(200).json({ success: true, data: [] });
         }
-        const productIds = products.map(p => p._id);
+        const productIds = products.map((p) => p._id);
 
-        let demandByProduct = new Map(); // productId -> { totalQty, periodsCount, perMonth }
+        let velocityMap = new Map();
+        let seasonalMap = new Map();
 
-        if (strategy === 'Upcoming Season Average') {
-            const months = (seasonMonths || []).map(Number);
-            if (months.length === 0) {
-                return res.status(400).json({ message: 'Select at least one season month for this strategy.' });
+        if (useVelocity) velocityMap = await computeVelocityDemand(productIds, vMonths);
+        if (useSeasonal) seasonalMap = await computeSeasonalDemand(productIds, sMonths, lookbackYears);
+
+        const suggestions = products.map((p) => {
+            const key = String(p._id);
+            const v = velocityMap.get(key) || null;
+            const s = seasonalMap.get(key) || null;
+
+            if (!v && !s) return null;
+
+            let chosenPerMonth = 0;
+            let basis = null;
+
+            const vDemand = v ? v.perMonth : 0;
+            const sDemand = s ? s.perMonth : 0;
+
+            if (useVelocity && useSeasonal) {
+                if (sDemand > vDemand) {
+                    chosenPerMonth = sDemand;
+                    basis = `${s.basis} (Higher than recent trend)`;
+                } else {
+                    chosenPerMonth = vDemand;
+                    basis = `${v.basis} (Higher than seasonal avg)`;
+                }
+            } else if (useVelocity) {
+                chosenPerMonth = vDemand;
+                basis = v.basis;
+            } else if (useSeasonal) {
+                chosenPerMonth = sDemand;
+                basis = s.basis;
             }
 
-            // Look back up to 4 prior years for the same set of months.
-            const currentYear = new Date().getFullYear();
-            const years = [currentYear - 1, currentYear - 2, currentYear - 3, currentYear - 4];
+            if (chosenPerMonth <= 0) return null;
 
-            const agg = await SalesInvoice.aggregate([
-                { $unwind: '$items' },
-                { $match: { 'items.productId': { $in: productIds } } },
-                {
-                    $project: {
-                        productId: '$items.productId',
-                        qty: { $add: ['$items.chargeableQty', '$items.freeQty'] },
-                        month: { $month: '$invoiceDate' },
-                        year: { $year: '$invoiceDate' },
-                    },
-                },
-                { $match: { month: { $in: months }, year: { $in: years } } },
-                {
-                    $group: {
-                        _id: { productId: '$productId', year: '$year' },
-                        yearlyQty: { $sum: '$qty' },
-                    },
-                },
-                {
-                    $group: {
-                        _id: '$_id.productId',
-                        totalQty: { $sum: '$yearlyQty' },
-                        yearsSeen: { $sum: 1 },
-                    },
-                },
-            ]);
+            const currentStock = p.totalStock || 0;
+            
+            // The absolute formula: (Average Monthly Sales * 2 * Coverage) - Current Stock
+            const projectedDemand = Math.round(chosenPerMonth * 2 * coverMonths);
+            const suggestedQty = Math.max(0, projectedDemand - currentStock);
+            
+            if (suggestedQty <= 0) return null;
 
-            agg.forEach(row => {
-                const monthsInSeason = months.length;
-                const avgPerSeason = row.totalQty / Math.max(1, row.yearsSeen);
-                demandByProduct.set(String(row._id), {
-                    totalQty: row.totalQty,
-                    perMonth: avgPerSeason / monthsInSeason,
-                    basis: `${row.yearsSeen}-yr seasonal avg`,
-                });
-            });
-        } else {
-            const days = STRATEGY_DAYS[strategy] || 30;
-            const since = new Date();
-            since.setDate(since.getDate() - days);
+            return {
+                productId: p._id,
+                productName: p.name,
+                companyId: p.companyId,
+                companyName: p.company, // Fallback
+                currentStock,
+                avgMonthlyDemand: Math.round(chosenPerMonth),
+                projectedDemand,
+                suggestedQty,
+                finalQty: suggestedQty,
+                priority: priorityFor(currentStock, chosenPerMonth),
+                basis,
+            };
+        }).filter(Boolean).sort((a, b) => {
+            const order = { Critical: 0, High: 1, Normal: 2 };
+            return order[a.priority] - order[b.priority];
+        });
 
-            const agg = await SalesInvoice.aggregate([
-                { $match: { invoiceDate: { $gte: since } } },
-                { $unwind: '$items' },
-                { $match: { 'items.productId': { $in: productIds } } },
-                {
-                    $group: {
-                        _id: '$items.productId',
-                        totalQty: { $sum: { $add: ['$items.chargeableQty', '$items.freeQty'] } },
-                    },
-                },
-            ]);
-
-            agg.forEach(row => {
-                demandByProduct.set(String(row._id), {
-                    totalQty: row.totalQty,
-                    perMonth: row.totalQty / (days / 30),
-                    basis: `${days}-day velocity`,
-                });
-            });
-        }
-
-        const suggestions = products
-            .map(p => {
-                const demand = demandByProduct.get(String(p._id));
-                if (!demand || demand.perMonth <= 0) return null;
-
-                const projectedDemand = Math.round(demand.perMonth * coverMonths);
-                const currentStock = p.totalStock || 0;
-                const suggestedQty = Math.max(0, projectedDemand - currentStock);
-
-                if (suggestedQty <= 0) return null;
-
-                let priority = 'Normal';
-                if (currentStock === 0) priority = 'Critical';
-                else if (currentStock < demand.perMonth * 0.5) priority = 'High';
-
-                return {
-                    productId: p._id,
-                    productName: p.name,
-                    companyId: p.companyId,
-                    companyName: p.company,
-                    currentStock,
-                    avgMonthlyDemand: Math.round(demand.perMonth),
-                    projectedDemand,
-                    suggestedQty,
-                    finalQty: suggestedQty,
-                    priority,
-                    basis: demand.basis,
-                };
-            })
-            .filter(Boolean)
-            .sort((a, b) => {
-                const order = { Critical: 0, High: 1, Normal: 2 };
-                return order[a.priority] - order[b.priority];
-            });
-
-        res.status(200).json({ success: true, count: suggestions.length, data: suggestions });
+        res.status(200).json({
+            success: true,
+            params: {
+                companyIds: companyIds && companyIds.length ? companyIds : 'all',
+                useVelocity,
+                useSeasonal,
+                stockCoverMonths: coverMonths,
+            },
+            count: suggestions.length,
+            data: suggestions,
+        });
     } catch (error) {
         console.error('generateSuggestions error:', error);
         res.status(500).json({ error: error.message });
