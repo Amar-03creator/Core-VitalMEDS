@@ -101,4 +101,3 @@ purchaseBillSchema.pre('save', async function () {
 
 module.exports = mongoose.model('PurchaseBill', purchaseBillSchema);
 
-module.exports = mongoose.model('PurchaseBill', purchaseBillSchema);

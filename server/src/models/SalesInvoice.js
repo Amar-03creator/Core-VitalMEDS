@@ -18,6 +18,17 @@ const salesInvoiceSchema = new mongoose.Schema({
     clientBillingAddress: { type: String },
     clientDrugLicense: { type: String },
 
+    sellerSnapshot: {
+        establishmentName: String,
+        addressString: String,
+        district: String,
+        gstin: String,
+        drugsBazaarId: String,
+        drugLicenses: String, 
+        proprietorPhone: String,
+        cpPhone: String
+    },
+
     invoiceDate: { type: Date, required: true },
     dueDate: { type: Date },
     billType: { type: String, enum: ['Cash', 'Credit'], required: true },

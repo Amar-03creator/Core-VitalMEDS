@@ -4,6 +4,8 @@ const companySchema = new mongoose.Schema({
     // --- Basic Info ---
     companyName: { type: String, required: true },
     shortCode: { type: String },
+    logoUrl: { type: String },
+    logoPublicId: { type: String },
     status: {
         type: String,
         enum: ['Active', 'Inactive'],
@@ -45,11 +47,12 @@ const companySchema = new mongoose.Schema({
     leadTimeDays: { type: Number },
     minimumOrderValue: { type: Number },
 
-    // --- Financial Tracking ---
+    // --- Financial Tracking (The Ledger) ---
     pendingRefunds: { type: Number, default: 0 },
     advancePaid: { type: Number, default: 0 },
+    totalOutstanding: { type: Number, default: 0 }, // ✨ NEW: Tracks unpaid credit bills
 
-    // ★ NEW – Bank Details
+    // --- Bank Details ---
     bankDetails: [
         {
             bankName:      { type: String, required: true },

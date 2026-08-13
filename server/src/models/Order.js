@@ -5,6 +5,7 @@ const orderSchema = new mongoose.Schema({
     orderId: { type: String, required: true, unique: true },
     clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'Client', required: true },
     inquiryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Inquiry', default: null },
+    source: { type: String, default: 'direct' },
 
     isCancellable: { type: Boolean, default: true },
     adminCancelReason: String,
@@ -83,7 +84,15 @@ const orderSchema = new mongoose.Schema({
     pricingSharedAt: Date,
 
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
-    updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' }
+    updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
+
+    actionLogs: [{
+        action: String, 
+        byName: String, 
+        role: String,   
+        timestamp: { type: Date, default: Date.now },
+        note: String
+    }]
 }, { timestamps: true });
 
 module.exports = mongoose.model('Order', orderSchema);
