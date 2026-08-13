@@ -1,4 +1,3 @@
-// client/src/context/AuthContext.jsx
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { CognitoUserPool, CognitoUser, AuthenticationDetails, CognitoUserAttribute } from 'amazon-cognito-identity-js';
 import axios from 'axios';
@@ -19,7 +18,44 @@ export const AuthProvider = ({ children }) => {
   const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const authAxios = axios.create({ baseURL: API_BASE_URL });
+
+  const logout = useCallback((isSuspended = false) => {
+    try {
+      const cognitoUser = userPool.getCurrentUser();
+      if (cognitoUser) {
+        cognitoUser.signOut();
+      }
+    } catch (err) {
+      console.error("AWS SignOut Error:", err);
+    } finally {
+      setUser(null);
+      setToken(null);
+      setRole(null);
+      localStorage.clear();
+      sessionStorage.clear();
+
+      // ✨ FIX: Check that it is strictly equal to boolean true
+      const wasSuspended = isSuspended === true;
+      window.location.replace(wasSuspended ? '/login?suspended=true' : '/login');
+    }
+  }, []);
+
+  // ✨ NEW: The Frontend Auto-Kick Interceptor
+  useEffect(() => {
+    const resInterceptor = authAxios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        // If the backend bouncer catches the suspended CP, instantly log them out
+        if (error.response?.status === 403 && error.response?.data?.error === 'SUSPENDED_CP') {
+          logout(true);
+        }
+        return Promise.reject(error);
+      }
+    );
+    return () => authAxios.interceptors.response.eject(resInterceptor);
+  }, [authAxios, logout]);
 
   authAxios.interceptors.request.use(
     (config) => {
@@ -51,10 +87,10 @@ export const AuthProvider = ({ children }) => {
         {},
         { headers: { Authorization: `Bearer ${idToken}` } }
       );
-      
+
       setUser(data.profile);
-      setRole(data.role); 
-      
+      setRole(data.role);
+
       if (data.role === 'client' && data.profile && data.profile._id) {
         localStorage.setItem('clientId', data.profile._id);
       } else if (data.role === 'admin') {
@@ -85,7 +121,7 @@ export const AuthProvider = ({ children }) => {
       setToken(idToken);
       fetchUserProfile(idToken).finally(() => setLoading(false));
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -106,7 +142,13 @@ export const AuthProvider = ({ children }) => {
             resolve({ success: true, role: userRole });
           } catch (err) { reject(err); }
         },
-        onFailure: (err) => reject(err),
+        onFailure: (err) => {
+          // ✨ NEW: Catch the exact AWS error if they try to log back in
+          if (err.message === 'User is disabled.') {
+            return reject(new Error('You are suspended by the proprietor.'));
+          }
+          reject(err);
+        },
         newPasswordRequired: () => {
           resolve({ success: false, challenge: 'NEW_PASSWORD_REQUIRED', cognitoUser });
         }
@@ -130,12 +172,11 @@ export const AuthProvider = ({ children }) => {
     });
   };
 
-  // ✨ NEW: Change Password Handler
   const changePassword = (oldPassword, newPassword) => {
     return new Promise((resolve, reject) => {
       const cognitoUser = userPool.getCurrentUser();
       if (!cognitoUser) return reject(new Error("No active session. Please log in again."));
-      
+
       cognitoUser.getSession((err) => {
         if (err) return reject(err);
         cognitoUser.changePassword(oldPassword, newPassword, (err, result) => {
@@ -146,15 +187,39 @@ export const AuthProvider = ({ children }) => {
     });
   };
 
-  // ✨ NEW: Update Email/Phone in Cognito
+  // ✨ NATIVE AWS PHASE 1: Tell Cognito to send the email directly
+  const sendPasswordResetCode = (email) => {
+    return new Promise((resolve, reject) => {
+      const cognitoUser = new CognitoUser({ Username: email, Pool: userPool });
+
+      cognitoUser.forgotPassword({
+        onSuccess: (data) => resolve(data),
+        onFailure: (err) => reject(err),
+        inputVerificationCode: (data) => resolve({ success: true, ...data })
+      });
+    });
+  };
+
+  // ✨ NATIVE AWS PHASE 2: Send the OTP directly to Cognito
+  const confirmPasswordReset = (email, code, newPassword) => {
+    return new Promise((resolve, reject) => {
+      const cognitoUser = new CognitoUser({ Username: email, Pool: userPool });
+
+      cognitoUser.confirmPassword(code, newPassword, {
+        onSuccess: () => resolve({ success: true }),
+        onFailure: (err) => reject(err),
+      });
+    });
+  };
+
   const updateCognitoContact = (email, phone) => {
     return new Promise((resolve, reject) => {
       const cognitoUser = userPool.getCurrentUser();
       if (!cognitoUser) return reject(new Error("No active session. Please log in again."));
-      
+
       cognitoUser.getSession((err) => {
         if (err) return reject(err);
-        
+
         const attributeList = [];
         if (email) attributeList.push(new CognitoUserAttribute({ Name: 'email', Value: email }));
         if (phone) {
@@ -170,15 +235,14 @@ export const AuthProvider = ({ children }) => {
     });
   };
 
-  // ✨ NEW: Verify the 6-digit OTP for email/phone changes
   const verifyContactOtp = (attributeName, code) => {
     return new Promise((resolve, reject) => {
       const cognitoUser = userPool.getCurrentUser();
       if (!cognitoUser) return reject(new Error("No active session. Please log in again."));
-      
+
       cognitoUser.getSession((err) => {
         if (err) return reject(err);
-        
+
         cognitoUser.verifyAttribute(attributeName, code, {
           onSuccess: (result) => resolve(result),
           onFailure: (err) => reject(err),
@@ -187,35 +251,15 @@ export const AuthProvider = ({ children }) => {
     });
   };
 
-  const logout = useCallback(() => {
-    try {
-      const cognitoUser = userPool.getCurrentUser();
-      if (cognitoUser) {
-        cognitoUser.signOut();
-      }
-    } catch (err) {
-      console.error("AWS SignOut Error:", err);
-    } finally {
-      setUser(null);
-      setToken(null);
-      setRole(null); 
-      localStorage.clear();
-      sessionStorage.clear();
-      window.location.replace('/login');
-    }
-  }, []);
-
   return (
     <AuthContext.Provider value={{
       user, role, token, loading,
       login, logout, completeNewPassword, authAxios,
-      
-      // ✨ EXPOSED THE NEW FUNCTIONS HERE
-      changePassword, 
-      updateCognitoContact, 
+      changePassword,
+      updateCognitoContact,
       verifyContactOtp,
-      
-      isAuthenticated: !!token && !!user && !!role, 
+      sendPasswordResetCode, confirmPasswordReset,
+      isAuthenticated: !!token && !!user && !!role,
     }}>
       {children}
     </AuthContext.Provider>

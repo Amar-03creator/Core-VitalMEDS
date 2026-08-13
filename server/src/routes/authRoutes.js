@@ -1,6 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const { registerInit, registerVerify, verifyInviteCode, claimAccount } = require('../controllers/authController');
+const { 
+  registerInit, 
+  registerVerify, 
+  verifyInviteCode, 
+  claimAccount,
+  forgotPasswordInit,    
+  forgotPasswordConfirm  
+} = require('../controllers/authController');
 const { authenticate } = require('../middleware/authMiddleware');
 const Admin = require('../models/Admin');
 const Client = require('../models/Client');
@@ -10,6 +17,8 @@ router.post('/register-init', registerInit);     // ✨ STEP A: Sends OTP
 router.post('/register-verify', registerVerify); // ✨ STEP B: Checks OTP & Saves
 router.post('/verify-invite', verifyInviteCode);
 router.post('/claim-account', claimAccount);
+router.post('/forgot-password-init', forgotPasswordInit);
+router.post('/forgot-password-confirm', forgotPasswordConfirm);
 
 // ── Verify Token (JIT Provisioning & Login) ─────────────────────────────
 router.post('/verify-token', authenticate, async (req, res) => {

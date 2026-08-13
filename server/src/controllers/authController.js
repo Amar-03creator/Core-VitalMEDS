@@ -1,9 +1,11 @@
 // server/src/controllers/authController.js
+const mongoose = require('mongoose');
 const Client = require('../models/Client');
 const Admin = require('../models/Admin'); // ✨ NEW
 const Notification = require('../models/Notification'); // ✨ NEW
 const { getNextClientCode } = require('../helpers/SequenceHelper');
 const AWS = require('aws-sdk');
+const { sendMail } = require('../utils/mailer');
 
 /* ── MASKING & FORMATTING HELPERS ── */
 const maskEmail = (email) => {
@@ -11,6 +13,13 @@ const maskEmail = (email) => {
   const [name, domain] = email.split('@');
   return `${name.charAt(0)}***@${domain}`;
 };
+
+const otpSchema = new mongoose.Schema({
+  email: { type: String, required: true, index: true },
+  otp: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now, expires: 600 } 
+});
+const OTP = mongoose.models.OTP || mongoose.model('OTP', otpSchema);
 
 const maskPhone = (phone) => {
   if (!phone) return null;
@@ -317,5 +326,94 @@ exports.claimAccount = async (req, res) => {
   } catch (error) {
     console.error('claimAccount error:', error);
     res.status(500).json({ message: error.message || 'Server error while claiming account.' });
+  }
+};
+
+/* ── 4. CUSTOM FORGOT PASSWORD (INITIATE) ── */
+exports.forgotPasswordInit = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: 'Email is required.' });
+
+    const searchEmail = email.trim().toLowerCase();
+
+    // 1. Verify the email actually exists in our DB (Check Clients & Admins)
+    const isClient = await Client.findOne({ 'contacts.email': new RegExp(`^${searchEmail}$`, 'i') });
+    const isAdmin = await Admin.findOne({
+      $or: [
+        { email: new RegExp(`^${searchEmail}$`, 'i') },
+        { 'proprietor.emails': new RegExp(`^${searchEmail}$`, 'i') },
+        { 'competentPerson.emails': new RegExp(`^${searchEmail}$`, 'i') }
+      ]
+    });
+
+    // We return success even if not found to prevent hackers from guessing emails
+    if (!isClient && !isAdmin) {
+      return res.status(200).json({ success: true, message: 'If an account exists, a recovery code was sent.' });
+    }
+
+    // 2. Generate a 6-digit OTP and save it
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    await OTP.findOneAndUpdate(
+      { email: searchEmail }, 
+      { otp: otpCode, createdAt: new Date() }, 
+      { upsert: true }
+    );
+
+    // 3. Send Email using your custom Mailer
+    const html = `
+      <div style="font-family: Arial, sans-serif; padding: 20px;">
+        <h2>VitalMEDS Password Reset</h2>
+        <p>You requested a password reset. Here is your secure 6-digit verification code:</p>
+        <h1 style="background: #f1f5f9; padding: 10px; text-align: center; letter-spacing: 5px; color: #0f172a;">${otpCode}</h1>
+        <p>This code will expire in 10 minutes. If you did not request this, please ignore this email.</p>
+      </div>
+    `;
+
+    try {
+      await sendMail(searchEmail, 'VitalMEDS Password Recovery Code', html);
+    } catch (mailErr) {
+      // Your Mailer's DEV Fallback will trigger here and print to the Node console!
+      console.log(`\n🚨 [DEV FALLBACK] OTP FOR ${searchEmail} IS: ${otpCode} 🚨\n`);
+    }
+
+    res.status(200).json({ success: true, message: 'Recovery code sent successfully.' });
+
+  } catch (err) {
+    console.error('forgotPasswordInit Error:', err);
+    res.status(500).json({ message: 'Failed to initiate password reset.' });
+  }
+};
+
+/* ── 5. CUSTOM FORGOT PASSWORD (CONFIRM) ── */
+exports.forgotPasswordConfirm = async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+    const searchEmail = email.trim().toLowerCase();
+
+    // 1. Verify OTP in MongoDB
+    const record = await OTP.findOne({ email: searchEmail, otp: otp });
+    if (!record) {
+      return res.status(400).json({ message: 'Invalid or expired recovery code.' });
+    }
+
+    // 2. Forcefully Overwrite the Password in AWS Cognito
+    const cognito = new AWS.CognitoIdentityServiceProvider({ region: process.env.AWS_REGION || 'ap-south-1' });
+    
+    await cognito.adminSetUserPassword({
+      UserPoolId: process.env.COGNITO_USER_POOL_ID,
+      Username: searchEmail,
+      Password: newPassword,
+      Permanent: true // Instantly makes the password active without forcing another reset
+    }).promise();
+
+    // 3. Delete the used OTP
+    await OTP.deleteOne({ _id: record._id });
+
+    res.status(200).json({ success: true, message: 'Password updated successfully.' });
+
+  } catch (err) {
+    console.error('forgotPasswordConfirm Error:', err);
+    res.status(500).json({ message: err.message || 'Failed to securely reset password.' });
   }
 };

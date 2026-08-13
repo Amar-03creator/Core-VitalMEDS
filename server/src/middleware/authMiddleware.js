@@ -1,6 +1,6 @@
-// server/src/middleware/authMiddleware.js
 const { CognitoJwtVerifier } = require('aws-jwt-verify');
-const Client = require('../models/Client'); // ✨ FIX: Imported Client Model
+const Client = require('../models/Client');
+const Admin = require('../models/Admin'); // ✨ FIX: Imported Admin Model for the Bouncer
 
 // Create the verifier
 const verifier = CognitoJwtVerifier.create({
@@ -19,16 +19,45 @@ const authenticate = async (req, res, next) => {
     const token = authHeader.split(' ')[1];
     const payload = await verifier.verify(token);
     
-    // Safely check for admin (handles 'Admin', 'admins', 'SuperAdmin', etc.)
     const groups = payload['cognito:groups'] || [];
     const isAdmin = groups.some(g => g && g.toLowerCase().includes('admin'));
     
-    // Attach user profile data
+    let specificRole = 'System Admin';
+    let personName = 'Admin';
+
+    // ✨ THE SMART BOUNCER: Figure out exactly who this Admin is!
+    if (isAdmin) {
+      const loginEmail = payload.email.toLowerCase();
+      // Grab the ONE true master document
+      const adminDoc = await Admin.findOne({ 
+        gstinAdmin: { $exists: true, $ne: '' } 
+      }).sort({ updatedAt: -1 });
+
+      if (adminDoc) {
+        const isProp = adminDoc.proprietor?.emails?.some(e => e.toLowerCase() === loginEmail);
+        const isCP = adminDoc.competentPerson?.emails?.some(e => e.toLowerCase() === loginEmail);
+
+        if (isProp) {
+          specificRole = 'Proprietor';
+          personName = adminDoc.proprietor.name || 'Proprietor';
+        } else if (isCP) {
+          if (adminDoc.competentPerson.isSuspended) {
+            return res.status(403).json({ error: 'SUSPENDED_CP', message: 'You have been suspended by the proprietor.' });
+          }
+          specificRole = 'Competent Person';
+          personName = adminDoc.competentPerson.name || 'Competent Person';
+        }
+      }
+    }
+    
+    // Attach user profile data with exact identity
     req.user = {
       cognitold: payload.sub,
       email: payload.email,
       role: isAdmin ? 'admin' : 'client',
       isAdmin: isAdmin,
+      adminRole: specificRole, // ✨ NOW WE KNOW THE SEAT
+      name: personName,        // ✨ NOW WE KNOW THE NAME
       clientId: payload['custom:clientId'] || null,
     };
 
@@ -61,12 +90,10 @@ const requireClient = (req, res, next) => {
   next();
 };
 
-// ✨ NEW: Enforces the Zero-Trust Jail at the API level
 const requireActiveClient = async (req, res, next) => {
   try {
-    if (req.user?.isAdmin) return next(); // Admins bypass this
+    if (req.user?.isAdmin) return next(); 
 
-    // Fetch the client's current status from MongoDB
     const client = await Client.findOne({ 'contacts.email': new RegExp(`^${req.user.email}$`, 'i') });
     
     if (!client) {
