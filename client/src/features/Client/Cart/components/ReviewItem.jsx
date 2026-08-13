@@ -1,13 +1,21 @@
+// src/features/Client/Cart/components/ReviewItem.jsx
 import { Trash2, Tag } from 'lucide-react';
 import QuantityStepper from '../../../../components/QuantityStepper';
 import { getEstimatedUnitPrice, getEstimatedLineTotal } from '../utils/cartMath';
 
 const ReviewItem = ({ item, allItems, rateByKey, activeTab, onQtyChange, onRemove, onAddOfferItem }) => {
-  const unitPrice = getEstimatedUnitPrice(item, rateByKey);
-  const lineTotal = getEstimatedLineTotal(item, rateByKey);
+  // ✨ FIX 1: Bulletproof the math variables.
+  // If the backend is missing MRP or the rate is still calculating, these safely default to 0.
+  const rawUnitPrice = getEstimatedUnitPrice(item, rateByKey);
+  const rawLineTotal = getEstimatedLineTotal(item, rateByKey);
+  
+  const unitPrice = isNaN(Number(rawUnitPrice)) ? 0 : Number(rawUnitPrice);
+  const lineTotal = isNaN(Number(rawLineTotal)) ? 0 : Number(rawLineTotal);
 
   const shortCode = item.companyShortCode || item.companyDetails?.[0]?.shortCode || item.company;
-  const isInputEmpty = item.requestedQty === '';
+  
+  // ✨ FIX 2: Better empty state detection for the stepper input
+  const isInputEmpty = item.requestedQty === '' || item.requestedQty === null || isNaN(Number(item.requestedQty));
   const isOfferActive = item.offerApplied && !!item.offer;
 
   const tileBg = isOfferActive
@@ -25,7 +33,6 @@ const ReviewItem = ({ item, allItems, rateByKey, activeTab, onQtyChange, onRemov
     .filter(b => !isNaN(b.parsedDate.getTime()))
     .sort((a, b) => a.parsedDate - b.parsedDate);
 
-  // ✨ FIX 1: Safely grab the expiry date directly from the Batch ID!
   if (item.batchId && validBatches.length > 0) {
     const selectedBatch = validBatches.find(b => String(b._id) === String(item.batchId) || String(b.no) === String(item.batchId));
     if (selectedBatch) {
@@ -40,6 +47,7 @@ const ReviewItem = ({ item, allItems, rateByKey, activeTab, onQtyChange, onRemov
   const offerBatch = validBatches.find(b => b.offer && (b.offer.isActive || b.offer.description));
   const isOfferAlreadyInCart = allItems.some(i => i.productId === item.productId && String(i.batchId) === String(offerBatch?._id || offerBatch?.no));
   const showOfferBanner = activeTab === 'order' && offerBatch && !item.offerApplied && !isOfferAlreadyInCart;
+  
   return (
     <div className={`rounded-2xl border p-3 sm:p-5 flex flex-col gap-4 transition-all ${tileBg}`}>
       <div className="flex justify-between items-start gap-3">
@@ -73,6 +81,8 @@ const ReviewItem = ({ item, allItems, rateByKey, activeTab, onQtyChange, onRemov
             size="lg"
           />
         </div>
+        
+        {/* ✨ FIX 3: Safely formatted outputs that will never throw a .toFixed() TypeError */}
         <div className="text-right flex-shrink-0">
           <p className="text-slate-900 font-black text-2xl sm:text-3xl leading-none">
             ₹{isInputEmpty ? '0.00' : lineTotal.toFixed(2)}
@@ -93,7 +103,7 @@ const ReviewItem = ({ item, allItems, rateByKey, activeTab, onQtyChange, onRemov
         >
           <Tag size={16} className="text-orange-600 shrink-0 mt-0.5 sm:mt-0" />
           <p className="text-orange-800 text-sm font-medium leading-snug">
-            <span className="font-bold">Exclusive Scheme:</span> An offer of "{offerBatch.offer.description}" is available (MRP ₹{offerBatch.mrp.toFixed(2)}) expiring in {offerBatch.parsedDate.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}. <span className="underline font-bold text-orange-600 ml-1">Click to apply.</span>
+            <span className="font-bold">Exclusive Scheme:</span> An offer of "{offerBatch.offer.description}" is available (MRP ₹{(Number(offerBatch.mrp) || 0).toFixed(2)}) expiring in {offerBatch.parsedDate.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}. <span className="underline font-bold text-orange-600 ml-1">Click to apply.</span>
           </p>
         </button>
       )}

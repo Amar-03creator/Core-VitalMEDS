@@ -29,6 +29,10 @@ import SubmitSuccessModal from '../../features/Client/Cart/components/SubmitSucc
 const ClientCart = () => {
   const navigate = useNavigate();
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
   const [activeTab, setActiveTab] = useState(() => sessionStorage.getItem('cartActiveTab') || 'order');
   const [billPreference, setBillPreference] = useState(() => sessionStorage.getItem('cartBillPref') || 'Credit');
   const [clientNote, setClientNote] = useState(() => sessionStorage.getItem('cartClientNote') || '');
@@ -43,7 +47,7 @@ const ClientCart = () => {
   } = useCurrentClient();
 
   const { products } = useProductCatalog();
-  
+
   const {
     inquiryItems = [],
     orderItems = [],
@@ -62,9 +66,9 @@ const ClientCart = () => {
 
   const rawItems = activeTab === 'order' ? orderItems : inquiryItems;
 
-const items = useMemo(() => {
+  const items = useMemo(() => {
     if (!rawItems || !Array.isArray(rawItems)) return [];
-    
+
     const mapped = rawItems.map((item) => {
       const catalogMatch = products.find((p) => p.productId === item.productId);
       return {
@@ -77,7 +81,7 @@ const items = useMemo(() => {
     // ✨ FIX: Group identical products together so Offers snap right below Standards!
     const grouped = [];
     const seenIds = new Set();
-    
+
     mapped.forEach((item) => {
       if (!seenIds.has(item.productId)) {
         seenIds.add(item.productId);
@@ -86,7 +90,7 @@ const items = useMemo(() => {
         grouped.push(...family);
       }
     });
-    
+
     return grouped;
   }, [rawItems, products]);
 
@@ -96,12 +100,12 @@ const items = useMemo(() => {
   const mrpTotal = getMrpTotal(items);
   const estimatedTotal = getEstimatedTotal(items, rateByKey);
   const nearLimit = isNearCreditLimit(totalOutstanding, creditLimit, estimatedTotal);
-  
+
   const hasUnavailable = items.some((i) => {
     const cartKey = `${i.productId}_${i.batchId || 'standard'}`;
     return tierByKey?.[cartKey]?.tier === 'unavailable';
   });
-  
+
   useEffect(() => {
     if (!clientLoading && !isApproved) {
       setActiveTab('inquiry');
@@ -116,7 +120,7 @@ const items = useMemo(() => {
       const qty = parseInt(i.requestedQty, 10) || 0;
       return {
         productId: i.productId,
-        batchId: i.batchId, 
+        batchId: i.batchId,
         requestedQty: qty,
         estimatedPrice: unitPrice,
         estimatedLineTotal: unitPrice * qty,
@@ -180,10 +184,10 @@ const items = useMemo(() => {
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
       <div>
-        <h1 className="text-slate-900 text-2xl sm:text-3xl font-bold">
+        <h1 className="text-slate-900 text-3xl font-black tracking-tight">
           Your Restock Cart
         </h1>
-        <p className="text-slate-500 font-medium mt-1 text-sm sm:text-base">
+        <p className="text-slate-500 text-base font-medium">
           Review your items before placing an order or inquiry
         </p>
       </div>
@@ -203,8 +207,8 @@ const items = useMemo(() => {
           <>
             <ReviewList
               items={items}
-              tierByKey={tierByKey} 
-              rateByKey={rateByKey} 
+              tierByKey={tierByKey}
+              rateByKey={rateByKey}
               activeTab={activeTab}
 
               onQtyChange={(productId, batchId, qty) => updateQty(activeTab, productId, batchId, qty)}
