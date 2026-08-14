@@ -65,12 +65,22 @@ exports.createPaymentReceipt = async (req, res) => {
     if (!client) {
       return res.status(404).json({ message: "Client not found" });
     }
+    const pDate = new Date(paymentDate);
+    const today = new Date();
+    today.setHours(23, 59, 59, 999); // Allow anytime today
+
+    if (pDate > today) {
+      return res.status(400).json({ message: "Payment date cannot be in the future." });
+    }
+    if (pDate < new Date(client.createdAt).setHours(0, 0, 0, 0)) {
+      return res.status(400).json({ message: "Payment date cannot be before the party's creation date." });
+    }
 
     // ✨ FIXED: Never allocate incoming payments to a cancelled invoice
     const unpaidInvoices = await SalesInvoice.find({
       clientObjectId: new mongoose.Types.ObjectId(clientObjectId),
       paymentStatus: { $in: ['UNPAID', 'PARTIALLY_PAID'] },
-      invoiceStatus: { $ne: 'CANCELLED' } 
+      invoiceStatus: { $ne: 'CANCELLED' }
     }).sort({ invoiceDate: 1 });
 
     let remainingAmount = totalAmountPaid;
@@ -127,14 +137,14 @@ exports.createPaymentReceipt = async (req, res) => {
 
     const newReceipt = new PaymentReceipt({
       receiptNumber,
-      clientObjectId: client._id, 
-      paymentDate, 
+      clientObjectId: client._id,
+      paymentDate,
       paymentMode,
-      referenceNumber, 
-      totalAmountPaid, 
+      referenceNumber,
+      totalAmountPaid,
       allocatedInvoices: allocatedInvoicesList,
-      unallocatedAmount: remainingAmount, 
-      manualAllocation: false, 
+      unallocatedAmount: remainingAmount,
+      manualAllocation: false,
       adminRemarks,
     });
 
@@ -154,139 +164,151 @@ exports.createPaymentReceipt = async (req, res) => {
 
 // The Update Function
 exports.updatePaymentReceipt = async (req, res) => {
-    const session = await mongoose.startSession();
-    try {
-        const { id } = req.params;
-        const { paymentDate, paymentMode, referenceNumber, totalAmountPaid, adminRemarks } = req.body;
-        let updatedReceipt;
+  const session = await mongoose.startSession();
+  try {
+    const { id } = req.params;
+    const { paymentDate, paymentMode, referenceNumber, totalAmountPaid, adminRemarks } = req.body;
+    let updatedReceipt;
 
-        await session.withTransaction(async () => {
-            const receipt = await PaymentReceipt.findById(id).session(session);
-            if (!receipt) throw new Error('Receipt not found');
-            if (!isWithinEditWindow(receipt)) {
-                throw new Error(`This payment can no longer be edited (older than ${EDIT_WINDOW_DAYS} days).`);
-            }
+    await session.withTransaction(async () => {
+      const receipt = await PaymentReceipt.findById(id).session(session);
+      if (!receipt) throw new Error('Receipt not found');
+      if (!isWithinEditWindow(receipt)) {
+        throw new Error(`This payment can no longer be edited (older than ${EDIT_WINDOW_DAYS} days).`);
+      }
 
-            await reverseReceiptEffects(receipt, session);
+      await reverseReceiptEffects(receipt, session);
 
-            const client = await Client.findById(receipt.clientObjectId).session(session);
-            const newAmount = totalAmountPaid !== undefined ? parseFloat(totalAmountPaid) : receipt.totalAmountPaid;
+      const client = await Client.findById(receipt.clientObjectId).session(session);
 
-            // ✨ FIXED: Prevent re-allocating to a cancelled bill during an edit
-            const unpaidInvoices = await SalesInvoice.find({
-                clientObjectId: client._id,
-                paymentStatus: { $in: ['UNPAID', 'PARTIALLY_PAID'] },
-                invoiceStatus: { $ne: 'CANCELLED' }
-            }).sort({ invoiceDate: 1 }).session(session);
+      const pDate = paymentDate ? new Date(paymentDate) : new Date(receipt.paymentDate);
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
 
-            let remaining = newAmount;
-            let actuallyAllocated = 0;
-            const allocatedList = [];
+      if (pDate > today) {
+        throw new Error("Payment date cannot be in the future.");
+      }
+      if (pDate < new Date(client.createdAt).setHours(0, 0, 0, 0)) {
+        throw new Error("Payment date cannot be before the party's creation date.");
+      }
 
-            for (const invoice of unpaidInvoices) {
-                if (remaining <= 0) break;
-                const toPay = Math.min(remaining, invoice.dueAmount);
-                invoice.dueAmount -= toPay;
-                remaining -= toPay;
-                actuallyAllocated += toPay;
-                invoice.paymentStatus = invoice.dueAmount === 0 ? 'PAID' : 'PARTIALLY_PAID';
-                allocatedList.push({ invoiceId: invoice._id, invoiceNumber: invoice.invoiceNumber, amountCleared: toPay });
-                await invoice.save({ session });
-            }
+      const newAmount = totalAmountPaid !== undefined ? parseFloat(totalAmountPaid) : receipt.totalAmountPaid;
 
-            client.totalOutstanding = (client.totalOutstanding || 0) - actuallyAllocated;
-            if (remaining > 0) client.creditBalance = (client.creditBalance || 0) + remaining;
+      // ✨ FIXED: Prevent re-allocating to a cancelled bill during an edit
+      const unpaidInvoices = await SalesInvoice.find({
+        clientObjectId: client._id,
+        paymentStatus: { $in: ['UNPAID', 'PARTIALLY_PAID'] },
+        invoiceStatus: { $ne: 'CANCELLED' }
+      }).sort({ invoiceDate: 1 }).session(session);
 
-            const oldestUnpaid = await SalesInvoice.findOne({
-                clientObjectId: client._id,
-                paymentStatus: { $in: ['UNPAID', 'PARTIALLY_PAID'] },
-            }).sort({ invoiceDate: 1 }).session(session);
-            client.outstandingDate = oldestUnpaid ? oldestUnpaid.invoiceDate : null;
+      let remaining = newAmount;
+      let actuallyAllocated = 0;
+      const allocatedList = [];
 
-            await client.save({ session });
+      for (const invoice of unpaidInvoices) {
+        if (remaining <= 0) break;
+        const toPay = Math.min(remaining, invoice.dueAmount);
+        invoice.dueAmount -= toPay;
+        remaining -= toPay;
+        actuallyAllocated += toPay;
+        invoice.paymentStatus = invoice.dueAmount === 0 ? 'PAID' : 'PARTIALLY_PAID';
+        allocatedList.push({ invoiceId: invoice._id, invoiceNumber: invoice.invoiceNumber, amountCleared: toPay });
+        await invoice.save({ session });
+      }
 
-            receipt.paymentDate = paymentDate || receipt.paymentDate;
-            receipt.paymentMode = paymentMode || receipt.paymentMode;
-            receipt.referenceNumber = referenceNumber !== undefined ? referenceNumber : receipt.referenceNumber;
-            receipt.totalAmountPaid = newAmount;
-            receipt.allocatedInvoices = allocatedList;
-            receipt.unallocatedAmount = remaining;
-            receipt.adminRemarks = adminRemarks !== undefined ? adminRemarks : receipt.adminRemarks;
-            
-            await receipt.save({ session });
-            updatedReceipt = receipt;
-        });
-        
-        // Populate client name for frontend state updating
-        await updatedReceipt.populate('clientObjectId', 'establishmentName city line');
+      client.totalOutstanding = (client.totalOutstanding || 0) - actuallyAllocated;
+      if (remaining > 0) client.creditBalance = (client.creditBalance || 0) + remaining;
 
-        res.status(200).json({ message: 'Payment receipt updated successfully', paymentReceipt: updatedReceipt });
-    } catch (error) {
-        console.error('updatePaymentReceipt error:', error);
-        res.status(error.message?.includes('no longer be edited') ? 403 : 500).json({ message: error.message });
-    } finally {
-        await session.endSession();
-    }
+      const oldestUnpaid = await SalesInvoice.findOne({
+        clientObjectId: client._id,
+        paymentStatus: { $in: ['UNPAID', 'PARTIALLY_PAID'] },
+      }).sort({ invoiceDate: 1 }).session(session);
+      client.outstandingDate = oldestUnpaid ? oldestUnpaid.invoiceDate : null;
+
+      await client.save({ session });
+
+      receipt.paymentDate = paymentDate || receipt.paymentDate;
+      receipt.paymentMode = paymentMode || receipt.paymentMode;
+      receipt.referenceNumber = referenceNumber !== undefined ? referenceNumber : receipt.referenceNumber;
+      receipt.totalAmountPaid = newAmount;
+      receipt.allocatedInvoices = allocatedList;
+      receipt.unallocatedAmount = remaining;
+      receipt.adminRemarks = adminRemarks !== undefined ? adminRemarks : receipt.adminRemarks;
+
+      await receipt.save({ session });
+      updatedReceipt = receipt;
+    });
+
+    // Populate client name for frontend state updating
+    await updatedReceipt.populate('clientObjectId', 'establishmentName city line');
+
+    res.status(200).json({ message: 'Payment receipt updated successfully', paymentReceipt: updatedReceipt });
+  } catch (error) {
+    console.error('updatePaymentReceipt error:', error);
+    res.status(error.message?.includes('no longer be edited') ? 403 : 500).json({ message: error.message });
+  } finally {
+    await session.endSession();
+  }
 };
 
 // The Delete Function
 exports.deletePaymentReceipt = async (req, res) => {
-    const session = await mongoose.startSession();
-    try {
-        const { id } = req.params;
-        let deletedNumber;
-        await session.withTransaction(async () => {
-            const receipt = await PaymentReceipt.findById(id).session(session);
-            if (!receipt) throw new Error('Receipt not found');
-            if (!isWithinEditWindow(receipt)) {
-                throw new Error(`This payment can no longer be deleted (older than ${EDIT_WINDOW_DAYS} days).`);
-            }
-            await reverseReceiptEffects(receipt, session);
-            deletedNumber = receipt.receiptNumber;
-            await PaymentReceipt.findByIdAndDelete(id).session(session);
-        });
-        res.status(200).json({ message: `Receipt ${deletedNumber} deleted and ledger reversed.` });
-    } catch (error) {
-        console.error('deletePaymentReceipt error:', error);
-        res.status(error.message?.includes('no longer be deleted') ? 403 : 500).json({ message: error.message });
-    } finally {
-        await session.endSession();
-    }
+  const session = await mongoose.startSession();
+  try {
+    const { id } = req.params;
+    let deletedNumber;
+    await session.withTransaction(async () => {
+      const receipt = await PaymentReceipt.findById(id).session(session);
+      if (!receipt) throw new Error('Receipt not found');
+      if (!isWithinEditWindow(receipt)) {
+        throw new Error(`This payment can no longer be deleted (older than ${EDIT_WINDOW_DAYS} days).`);
+      }
+      await reverseReceiptEffects(receipt, session);
+      deletedNumber = receipt.receiptNumber;
+      await PaymentReceipt.findByIdAndDelete(id).session(session);
+    });
+    res.status(200).json({ message: `Receipt ${deletedNumber} deleted and ledger reversed.` });
+  } catch (error) {
+    console.error('deletePaymentReceipt error:', error);
+    res.status(error.message?.includes('no longer be deleted') ? 403 : 500).json({ message: error.message });
+  } finally {
+    await session.endSession();
+  }
 };
 
 
 exports.reconcileClientLedger = async (req, res) => {
-    try {
-        const { clientObjectId } = req.params;
-        const client = await Client.findById(clientObjectId);
-        if (!client) return res.status(404).json({ message: "Client not found" });
+  try {
+    const { clientObjectId } = req.params;
+    const client = await Client.findById(clientObjectId);
+    if (!client) return res.status(404).json({ message: "Client not found" });
 
-        // ✨ FIXED: Ensure the true debt calculation ignores voided bills
-        const unpaidInvoices = await SalesInvoice.find({
-            clientObjectId: new mongoose.Types.ObjectId(clientObjectId),
-            paymentStatus: { $in: ['UNPAID', 'PARTIALLY_PAID'] },
-            invoiceStatus: { $ne: 'CANCELLED' }
-        });
+    // ✨ FIXED: Ensure the true debt calculation ignores voided bills
+    const unpaidInvoices = await SalesInvoice.find({
+      clientObjectId: new mongoose.Types.ObjectId(clientObjectId),
+      paymentStatus: { $in: ['UNPAID', 'PARTIALLY_PAID'] },
+      invoiceStatus: { $ne: 'CANCELLED' }
+    });
 
-        let trueDebt = 0;
-        unpaidInvoices.forEach(invoice => { trueDebt += invoice.dueAmount; });
+    let trueDebt = 0;
+    unpaidInvoices.forEach(invoice => { trueDebt += invoice.dueAmount; });
 
-        client.totalOutstanding = trueDebt;
-        if (trueDebt > 0) client.creditBalance = 0; 
-        
-        await client.save();
-        res.status(200).json({ message: "Ledger Reconciled Successfully!", previousGlitchyDebt: client.totalOutstanding, newTrueDebt: trueDebt });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
+    client.totalOutstanding = trueDebt;
+    if (trueDebt > 0) client.creditBalance = 0;
+
+    await client.save();
+    res.status(200).json({ message: "Ledger Reconciled Successfully!", previousGlitchyDebt: client.totalOutstanding, newTrueDebt: trueDebt });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 exports.getAllPaymentReceipts = async (req, res) => {
   try {
     const { line, city, partyId, from, to, sort } = req.query;
- 
+
     let clientIdFilter = null;
- 
+
     if (partyId) {
       clientIdFilter = [new mongoose.Types.ObjectId(partyId)];
     } else if (line || city) {
@@ -296,10 +318,10 @@ exports.getAllPaymentReceipts = async (req, res) => {
       const matchingClients = await Client.find(clientQuery, '_id');
       clientIdFilter = matchingClients.map(c => c._id);
     }
- 
+
     const receiptQuery = {};
     if (clientIdFilter) receiptQuery.clientObjectId = { $in: clientIdFilter };
- 
+
     if (from || to) {
       receiptQuery.paymentDate = {};
       if (from) receiptQuery.paymentDate.$gte = new Date(from);
@@ -309,16 +331,16 @@ exports.getAllPaymentReceipts = async (req, res) => {
         receiptQuery.paymentDate.$lte = toDate;
       }
     }
- 
-    let sortSpec = { paymentDate: -1 }; 
+
+    let sortSpec = { paymentDate: -1 };
     if (sort === 'date_asc') sortSpec = { paymentDate: 1 };
     else if (sort === 'amount_desc') sortSpec = { totalAmountPaid: -1 };
     else if (sort === 'amount_asc') sortSpec = { totalAmountPaid: 1 };
- 
+
     const receipts = await PaymentReceipt.find(receiptQuery)
       .sort(sortSpec)
       .populate('clientObjectId', 'establishmentName city line');
- 
+
     res.status(200).json({ success: true, data: receipts });
   } catch (error) {
     console.error('getAllPaymentReceipts error:', error);

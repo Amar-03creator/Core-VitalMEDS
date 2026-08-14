@@ -186,13 +186,12 @@ export const orderApi = {
   //   return res.blob();
   // },
   async downloadOrderInvoice(orderId) {
-    const res = await secureFetch(`/orders/${orderId}/invoice/pdf`);
+    // ✨ THE CACHE BUSTER: Added ?t=${Date.now()} to the URL!
+    const res = await secureFetch(`/orders/${orderId}/invoice/pdf?t=${Date.now()}`);
     if (!res.ok) throw new Error('Failed to download invoice');
 
-    // ✨ RESPONSE KO JSON MEIN READ KAREIN
     const data = await res.json();
 
-    // ✨ BASE64 KO WAPAS PURE BINARY (BLOB) MEIN CONVERT KAREIN
     const byteCharacters = atob(data.pdfData);
     const byteNumbers = new Array(byteCharacters.length);
     for (let i = 0; i < byteCharacters.length; i++) {

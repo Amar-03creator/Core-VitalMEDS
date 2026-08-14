@@ -1,3 +1,5 @@
+
+
 /**
  * ============================================================================
  * FILE: financeApi.js
@@ -8,11 +10,17 @@
  * ============================================================================
  */
 
-// client/src/services/api/financeApi.js
 import { secureFetch } from './apiCore';
 
 export const financeApi = {
   /* ── Purchase Bills ───────────────────────────────────────────────────── */
+
+  async getPurchaseBills() {
+    const res = await secureFetch(`/purchase-bills`);
+    if (!res.ok) throw new Error('Failed to fetch purchase bills');
+    return res.json();
+  },
+  
   async getLastRatesForProduct(productId) {
     const res = await secureFetch(`/purchase-bills/last-rates/${encodeURIComponent(productId)}`);
     if (!res.ok) throw new Error(await res.text());
@@ -58,6 +66,37 @@ export const financeApi = {
       body: JSON.stringify({ reason, adminId }),
     });
     if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to cancel purchase bill');
+    return res.json();
+  },
+
+  /* ── Supplier Payments (Outward) ──────────────────────────────────────── */
+  async createSupplierPayment(data) {
+    const res = await secureFetch(`/supplier-payments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to record supplier payment');
+    return res.json();
+  },
+
+  async getSupplierPayments() {
+    const res = await secureFetch(`/supplier-payments`);
+    if (!res.ok) throw new Error('Failed to fetch supplier payments');
+    return res.json();
+  },
+
+  async deleteSupplierPayment(id) {
+    const res = await secureFetch(`/supplier-payments/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to delete supplier payment');
+    return res.json();
+  },
+
+  async reconcileSupplierLedger(supplierId) {
+    const res = await secureFetch(`/supplier-payments/reconcile/${encodeURIComponent(supplierId)}`, {
+      method: 'POST'
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to reconcile ledger');
     return res.json();
   },
 
@@ -186,5 +225,11 @@ export const financeApi = {
     const res = await secureFetch(`/audit/run`, { method: 'POST' });
     if (!res.ok) throw new Error('Failed to run audit');
     return res.json();
-  }
+  },
+
+  async getTopProductsByRange(year, fromMonth, toMonth) {
+    const res = await secureFetch(`/dashboard/top-products-range?year=${year}&fromMonth=${fromMonth}&toMonth=${toMonth}`);
+    if (!res.ok) throw new Error('Failed to fetch top products range');
+    return res.json();
+  },
 };

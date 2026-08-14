@@ -15,6 +15,8 @@ import { orderApi } from './orderApi';
 import { productApi } from './productApi';
 import { financeApi } from './financeApi';
 import { billingApi } from './billingApi';
+import { cartApi } from './cartApi';
+import { adminApi } from './adminApi';
 
 
 export const api = {
@@ -23,6 +25,8 @@ export const api = {
   ...productApi,
   ...financeApi,
   ...billingApi,
+  ...cartApi,
+  ...adminApi
 
 };
 

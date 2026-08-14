@@ -9,7 +9,7 @@
  */
 
 // client/src/services/api/clientApi.js
-import { secureFetch } from './apiCore';
+import { secureFetch, BASE_URL } from './apiCore'; // ✨ FIX: Imported BASE_URL for the public route
 
 export const clientApi = {
   async getClients(queryString = '') {
@@ -123,7 +123,6 @@ export const clientApi = {
 
   /* ── Document Requests ────────────────────────────────────────────────── */
   async createDocumentRequest(clientId, payload) {
-    // ✨ FIX: Prepend /admin to match the router mount path
     const res = await secureFetch(`/admin/clients/${clientId}/documents/request`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -140,7 +139,6 @@ export const clientApi = {
   },
 
   async approveRejectDocumentRequest(requestId, status, rejectionNote = '') {
-    // Hits the /api/admin/documents/requests/:requestId endpoint
     const res = await secureFetch(`/admin/documents/requests/${requestId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -205,6 +203,7 @@ export const clientApi = {
     if (!res.ok) throw new Error('Failed to fetch notifications');
     return res.json();
   },
+  
   async markAllAdminNotificationsRead() {
     const res = await secureFetch(`/notifications/mark-all-read`, {
       method: 'PUT',
@@ -240,4 +239,18 @@ export const clientApi = {
     if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to generate invite code');
     return res.json();
   },
+
+  // Authenticated route for the Dashboard / About Us page
+  async getDistributorPublicProfile() {
+    const res = await secureFetch(`/clients/distributor-profile`);
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to fetch distributor profile');
+    return res.json();
+  },
+
+  // ✨ NEW: Completely unauthenticated, raw fetch specifically for the Landing Page
+  async getPublicContactInfo() {
+    const res = await fetch(`${BASE_URL}/clients/public-contact`);
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to fetch public contact info');
+    return res.json();
+  }
 };

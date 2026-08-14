@@ -36,8 +36,8 @@ const BillingPage = () => {
   return (
     <div className="px-4 py-5 space-y-5 max-w-2xl mx-auto">
       <div>
-        <h1 className="text-slate-900 text-2xl font-bold">Billing Hub</h1>
-        <p className="text-slate-500 text-base">Invoices, payments & outstanding</p>
+        <h1 className="text-slate-900 text-3xl font-black tracking-tight">Billing Hub</h1>
+        <p className="text-slate-500 text-base font-medium">Invoices, payments & outstanding</p>
       </div>
 
       {/* ★ FIXED: Changed to grid-cols-4 for the 4 tabs */}

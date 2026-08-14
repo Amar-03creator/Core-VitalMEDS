@@ -2,9 +2,18 @@
 import { X, Download, Printer } from 'lucide-react';
 import { STATUS_CFG } from '../../features/Admin/BillingPage/utils/constants';
 import { useBackHandler, useScrollLock } from '../../hooks/useBackHandler';
-import { downloadInvoicePDF, printInvoicePDF } from '../../features/Admin/BillingPage/pdf/invoice/generateInvoicePdf'; 
+import { downloadInvoicePDF, printInvoicePDF } from '../../features/Admin/BillingPage/pdf/invoice/generateInvoicePdf';
+import { api } from '../../services/api'; // ✨ Import API
+import { useState, useEffect } from 'react'; // ✨ Import React hooks
 
 export const InvoiceDetailModal = ({ invoice, onClose }) => {
+
+  const [adminProfile, setAdminProfile] = useState({});
+
+  useEffect(() => {
+    api.getAdminProfile().then(res => setAdminProfile(res.data?.data || res.data)).catch(console.error);
+  }, []);
+
   if (!invoice) return null;
   useBackHandler(true, onClose, `invDetail_${invoice.invoiceNumber || invoice.id}`);
   useScrollLock(true);
@@ -25,40 +34,40 @@ export const InvoiceDetailModal = ({ invoice, onClose }) => {
   const dueDate = invoice.dueDate
     ? invoice.dueDate
     : (() => {
-        if (!invoice.date && !invoice.invoiceDate) return '';
-        const dt = new Date(invoice.date || invoice.invoiceDate);
-        dt.setDate(dt.getDate() + 21);
-        return dt.toISOString().split('T')[0];
-      })();
+      if (!invoice.date && !invoice.invoiceDate) return '';
+      const dt = new Date(invoice.date || invoice.invoiceDate);
+      dt.setDate(dt.getDate() + 21);
+      return dt.toISOString().split('T')[0];
+    })();
 
   let totalTaxable = 0, totalCGST = 0, totalSGST = 0, totalIGST = 0, totalDiscount = 0;
-  
+
   const enhancedProducts = products.map(p => {
     const gross = p.grossAmount ?? ((p.rate || 0) * (p.chargeableQty || 0));
     const discountAmount = p.discountAmount ?? 0;
     const taxable = p.taxableValue ?? (gross - discountAmount);
-    
+
     const cgst = p.cgst ?? (taxable * (p.gstRate || 0) / 2 / 100);
     const sgst = p.sgst ?? (taxable * (p.gstRate || 0) / 2 / 100);
     const igst = p.igst ?? 0;
-    
+
     const lineTotal = p.lineTotal ?? (taxable + cgst + sgst + igst);
-    
+
     totalTaxable += taxable;
     totalCGST += cgst;
     totalSGST += sgst;
     totalIGST += igst;
     totalDiscount += discountAmount;
-    
+
     const totalGST = cgst + sgst + igst;
     const computedGstRate = taxable > 0 ? (totalGST / taxable * 100) : 0;
     const gstRate = p.gstRate || computedGstRate;
-    
+
     return { ...p, gross, discountAmount, taxable, cgst, sgst, igst, gstRate, lineTotal };
   });
 
   const globalDiscount = invoice.globalDiscountAmount || invoice.discount || 0;
-  
+
   // ★ FIXED: Stop recalculating. Trust the final amount saved in the database!
   const finalAmount = invoice.netAmount ?? invoice.amount ?? 0;
   const newOutstanding = invoice.dueAmount || invoice.due || 0;
@@ -82,7 +91,8 @@ export const InvoiceDetailModal = ({ invoice, onClose }) => {
     downloadInvoicePDF(
       getCleanInvoiceData(), enhancedProducts, totalTaxable, totalCGST, totalSGST,
       finalAmount, globalDiscount, globalDiscount,
-      totalIGST > 0 ? 'interstate' : 'intrastate' 
+      totalIGST > 0 ? 'interstate' : 'intrastate',
+      adminProfile
     );
   };
 
@@ -90,12 +100,13 @@ export const InvoiceDetailModal = ({ invoice, onClose }) => {
     printInvoicePDF(
       getCleanInvoiceData(), enhancedProducts, totalTaxable, totalCGST, totalSGST,
       finalAmount, globalDiscount, globalDiscount,
-      totalIGST > 0 ? 'interstate' : 'intrastate' 
+      totalIGST > 0 ? 'interstate' : 'intrastate',
+      adminProfile
     );
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-end">
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-end justify-center">
       <style>{`
         @keyframes slideUpFromBottom {
           from { opacity: 0; transform: translateY(100%); }
@@ -105,7 +116,7 @@ export const InvoiceDetailModal = ({ invoice, onClose }) => {
           animation: slideUpFromBottom 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
         }
       `}</style>
-      <div className="w-full bg-white rounded-t-2xl flex flex-col overflow-hidden animate-slideUp" style={{ height: '82dvh' }}>
+      <div className="w-full max-w-2xl bg-white rounded-t-2xl flex flex-col overflow-hidden animate-slideUp" style={{ height: '82dvh' }}>
         <div className="sticky top-0 bg-white flex items-center justify-between px-5 py-3 border-b border-slate-100 z-10">
           <div>
             <p className="font-bold text-slate-900 font-mono text-lg">{invoice.invoiceNumber || invoice.id}</p>
@@ -208,7 +219,7 @@ export const InvoiceDetailModal = ({ invoice, onClose }) => {
                 <span className="text-slate-800 font-medium">₹{totalIGST.toFixed(2)}</span>
               </div>
             )}
-            
+
             {globalDiscount > 0 && (
               <div className="flex justify-between px-4 py-3 text-base text-amber-700 bg-amber-50">
                 <span>
