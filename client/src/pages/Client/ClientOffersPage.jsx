@@ -24,7 +24,10 @@ import { toast } from 'sonner';
 export default function ClientOffersPage() {
   const { user } = useAuth();
   const { addItem } = useCart(); // ✨ EXTRACTED ADD FUNCTION
-  
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
   const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -55,6 +58,12 @@ export default function ClientOffersPage() {
 
   const displayProducts = useMemo(() => {
     let filtered = batches;
+    
+    // ✨ FRONTEND SAFETY NET: Actively strip out expired batches in case of caching
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    filtered = filtered.filter(b => new Date(b.expiryDate) >= today);
+
     if (search.trim()) {
       const s = search.toLowerCase();
       filtered = filtered.filter((b) =>
@@ -65,24 +74,24 @@ export default function ClientOffersPage() {
     }
 
     return filtered.map(b => ({
-      _id: b.productId, 
-      productId: b.productId, // ✨ CRITICAL: CartContext specifically looks for this key!
+      _id: b.productId,
+      productId: b.productId, 
       name: b.productName,
       company: b.company,
       companyShortCode: b.companyShortCode,
-      packing: b.packing, 
+      packing: b.packing,
       totalStock: b.remainingUnits,
       mrp: b.mrp,
       offer: b.offer,
       photoUrl: b.photoUrl,
-      categories: b.categories, 
+      categories: b.categories,
       type: b.type,
       hsnCode: b.hsnCode,
       gstRate: b.gstRate,
       compositions: b.compositions,
       description: b.description,
       usageTips: b.usageTips,
-      batches: [b] 
+      batches: [b]
     }));
   }, [batches, search]);
 
@@ -116,10 +125,10 @@ export default function ClientOffersPage() {
       <div className="mx-auto max-w-7xl space-y-6 px-3 py-6 sm:px-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2">
+            <h1 className="text-slate-900 text-3xl flex gap-2 font-black tracking-tight">
               <Sparkles className="text-amber-500" size={26} /> Special Schemes
             </h1>
-            <p className="mt-1 text-sm font-semibold text-slate-500">
+            <p className="text-slate-500 text-base font-medium">
               Exclusive deals, active schemes, and clearance offers.
             </p>
           </div>
@@ -153,11 +162,11 @@ export default function ClientOffersPage() {
                 <ProductCard
                   key={`${product._id}-${idx}`}
                   product={product}
-                  canOrder={isApproved} 
+                  canOrder={isApproved}
                   onView={setSelectedProduct}
                   onAddToOrder={handleAddToCart}
                   onAddToInquiry={handleAddToInquiry}
-                  isOfferMode={true} 
+                  isOfferMode={true}
                 />
               ))}
             </div>
@@ -168,11 +177,11 @@ export default function ClientOffersPage() {
       {selectedProduct && (
         <ProductDrawer
           product={selectedProduct}
-          canOrder={isApproved} 
+          canOrder={isApproved}
           onClose={() => setSelectedProduct(null)}
           onAddToOrder={handleAddToCart}
           onAddToInquiry={handleAddToInquiry}
-          isOfferMode={true} 
+          isOfferMode={true}
         />
       )}
     </>

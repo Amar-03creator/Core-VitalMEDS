@@ -1,3 +1,4 @@
+// src/pages/Admin/InventoryPage.jsx
 import { useState, useEffect, useRef } from 'react';
 import { Package, Search, Plus, Filter, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { api } from '../../services/api';
@@ -29,15 +30,15 @@ const ITEMS_PER_PAGE = 15;
 
 const InventoryPage = () => {
   const [inventory, setInventory] = useState([]); // Full filtered list
-  const [stats, setStats] = useState({ total: 0, lowStock: 0, outStock: 0, nearExp: 0 });
+  const [stats, setStats] = useState({ total: 0, lowStock: 0, outStock: 0, nearExp: 0, expired: 0 }); // ✨ ADDED expired
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState('');
-  const [quickFilter, setQuickFilter] = useState('All');
-  const quickFilterOptions = ['All', 'Low Stock', 'Out of Stock', 'Near Expiry'];
+  const [quickFilter, setQuickFilter] = useState('Active'); // ✨ Changed to Active
+  const quickFilterOptions = ['Active', 'Low Stock', 'Out of Stock', 'Near Expiry', 'Expired'];
   const [companies, setCompanies] = useState([]);
 
-  // ✨ URL-based Pagination State
+  // URL-based Pagination State
   const [searchParams, setSearchParams] = useSearchParams();
   const page = parseInt(searchParams.get('page') || '1', 10);
 
@@ -84,7 +85,6 @@ const InventoryPage = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [page]);
 
-
   // Safely track if dependencies ACTUALLY changed to avoid React 18 Strict Mode bugs
   const prevSearch = useRef(search);
   const prevFilters = useRef(filters);
@@ -102,9 +102,6 @@ const InventoryPage = () => {
   }, [search, filters, quickFilter]);
 
   // Load Data
-  // client/src/pages/Admin/InventoryPage.jsx
-
-  // Find your loadInventory function and update the filtering logic:
   const loadInventory = async () => {
     setLoading(true);
     try {
@@ -113,42 +110,56 @@ const InventoryPage = () => {
         company: filters.companies?.length > 0 ? filters.companies.join(',') : undefined,
         category: filters.categories?.length > 0 ? filters.categories.join(',') : undefined,
         type: filters.types?.length > 0 ? filters.types.join(',') : undefined,
-        showAlertsOnly: quickFilter !== 'All' ? 'true' : undefined
+        showAlertsOnly: quickFilter !== 'Active' ? 'true' : undefined 
       };
 
       const res = await api.getInventory(apiParams);
       const data = res.data || [];
-
-      // ✨ NEW: Get today's date for dynamic calculations
       const today = new Date();
 
-      // Apply quick filters client-side
-      let filteredData = data;
-      if (quickFilter === 'Low Stock') {
-        filteredData = data.filter(p => p.totalStock > 0 && p.totalStock <= (p.lowStockThreshold || 0));
+      // ✨ NEW: STRICT GRAVEYARD FILTERING
+      const isBatchExpired = (b) => b.expiryDate && (new Date(b.expiryDate) - today) <= 0;
+
+      // 1. Strip expired batches from the data completely unless we are in the "Expired" tab
+      let sanitizedData = data.map(product => {
+        const p = { ...product };
+        if (quickFilter === 'Expired') {
+          p.batches = p.batches?.filter(isBatchExpired) || [];
+        } else {
+          p.batches = p.batches?.filter(b => !isBatchExpired(b)) || [];
+        }
+        return p;
+      });
+
+      // 2. Apply the main product-level quick filters
+      let filteredData = sanitizedData;
+
+      if (quickFilter === 'Expired') {
+        filteredData = sanitizedData.filter(p => p.batches.length > 0);
+      } else if (quickFilter === 'Low Stock') {
+        filteredData = sanitizedData.filter(p => p.totalStock > 0 && p.totalStock <= (p.lowStockThreshold || 0));
       } else if (quickFilter === 'Out of Stock') {
-        filteredData = data.filter(p => p.totalStock === 0);
+        filteredData = sanitizedData.filter(p => p.totalStock === 0);
       } else if (quickFilter === 'Near Expiry') {
-        // ✨ FIX: Calculate dynamically! (Includes already expired items)
-        filteredData = data.filter(p => p.batches?.some(b => {
+        filteredData = sanitizedData.filter(p => p.batches?.some(b => {
           if (!b.expiryDate) return false;
           const days = (new Date(b.expiryDate) - today) / (1000 * 60 * 60 * 24);
-          return days <= (b.shortExpiryThreshold || 90);
+          return days > 0 && days <= (b.shortExpiryThreshold || 90);
         }));
       }
 
       setInventory(filteredData);
 
-      if (quickFilter === 'All') {
+      if (quickFilter === 'Active') {
         setStats({
           total: data.length,
           lowStock: data.filter(p => p.totalStock > 0 && p.totalStock <= (p.lowStockThreshold || 0)).length,
           outStock: data.filter(p => p.totalStock === 0).length,
-          // ✨ FIX: Dynamic calc for stats too!
+          expired: data.filter(p => p.batches?.some(isBatchExpired)).length, // ✨ ADDED
           nearExp: data.filter(p => p.batches?.some(b => {
             if (!b.expiryDate) return false;
             const days = (new Date(b.expiryDate) - today) / (1000 * 60 * 60 * 24);
-            return days <= (b.shortExpiryThreshold || 90);
+            return days > 0 && days <= (b.shortExpiryThreshold || 90); // ✨ MATH FIXED
           })).length,
         });
       }
@@ -186,7 +197,7 @@ const InventoryPage = () => {
   const clearFilters = () => {
     setFilters({ companies: [], categories: [], types: [] });
     setSearch('');
-    setQuickFilter('All');
+    setQuickFilter('Active');
   };
 
   const openEditPTR = (batch) => {
@@ -234,20 +245,27 @@ const InventoryPage = () => {
         </button>
       </div>
 
-   {/* Stats Cards */}
-<div className="grid grid-cols-2 gap-2">
-  {[
-    { label: 'Products', value: stats.total, bg: 'bg-white', text: 'text-slate-800', labelText: 'text-slate-400', border: 'border-slate-200' },
-    { label: 'Low Stock', value: stats.lowStock, bg: 'bg-amber-50', text: 'text-amber-700', labelText: 'text-amber-400', border: 'border-amber-200' },
-    { label: 'Out of Stock', value: stats.outStock, bg: 'bg-red-50', text: 'text-red-700', labelText: 'text-red-400', border: 'border-red-200' },
-    { label: 'Short-Expiry', value: stats.nearExp, bg: 'bg-orange-50', text: 'text-orange-700', labelText: 'text-orange-400', border: 'border-orange-200' },
-  ].map(({ label, value, bg, text, labelText, border }) => (
-    <div key={label} className={`rounded-2xl p-3 border ${bg} ${border} text-center shadow-sm`}>
-      <p className={`text-xl font-black ${text}`}>{value}</p>
-      <p className={`text-sm font-bold ${labelText} uppercase tracking-tight`}>{label}</p>
-    </div>
-  ))}
-</div>
+{/* ✨ UPDATED: 5 Stats Cards Grid (3 on top, 2 on bottom for mobile) */}
+      <div className="grid grid-cols-6 md:grid-cols-5 gap-2">
+        {[
+          // Top Row on Mobile (Shorter text, 3 items)
+          { label: 'Products', value: stats.total, bg: 'bg-white', text: 'text-slate-800', labelText: 'text-slate-400', border: 'border-slate-200', cols: 'col-span-2 md:col-span-1' },
+          { label: 'Low Stock', value: stats.lowStock, bg: 'bg-amber-50', text: 'text-amber-700', labelText: 'text-amber-400', border: 'border-amber-200', cols: 'col-span-2 md:col-span-1' },
+          { label: 'Expired', value: stats.expired, bg: 'bg-red-100', text: 'text-red-800', labelText: 'text-red-500', border: 'border-red-300', cols: 'col-span-2 md:col-span-1' },
+          
+          // Bottom Row on Mobile (Longer text, 2 items)
+          { label: 'Out of Stock', value: stats.outStock, bg: 'bg-red-50', text: 'text-red-700', labelText: 'text-red-400', border: 'border-red-200', cols: 'col-span-3 md:col-span-1' },
+          { label: 'Short-Expiry', value: stats.nearExp, bg: 'bg-orange-50', text: 'text-orange-700', labelText: 'text-orange-400', border: 'border-orange-200', cols: 'col-span-3 md:col-span-1' },
+        ].map(({ label, value, bg, text, labelText, border, cols }) => (
+          <div key={label} className={`rounded-2xl p-2 sm:p-3 border ${bg} ${border} text-center shadow-sm ${cols} flex flex-col justify-center`}>
+            <p className={`text-lg sm:text-xl font-black ${text} leading-none mb-1`}>{value}</p>
+            {/* ✨ Adjusted text size to text-xs on small screens so they fit perfectly side-by-side */}
+            <p className={`text-xs sm:text-sm md:text-base font-bold ${labelText} uppercase tracking-tight truncate`}>
+              {label}
+            </p>
+          </div>
+        ))}
+      </div>
 
       {/* Search & Filter Bar */}
       <div className="space-y-3">
@@ -335,10 +353,8 @@ const InventoryPage = () => {
             <p className="text-sm font-medium mt-1">Adjust your filters or add a new purchase bill.</p>
           </div>
         ) : (
-          /* ✨ Wrapped in an animated div keyed to the current page */
           <div className="space-y-3">
             {currentItems.map((p, index) => (
-              /* ✨ Animate each card individually with a staggered delay */
               <div
                 key={p._id || p.id}
                 className="animate-fadeSlideUp"

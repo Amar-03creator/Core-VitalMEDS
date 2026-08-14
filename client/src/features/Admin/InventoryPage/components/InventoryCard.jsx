@@ -1,6 +1,7 @@
+// src/features/Admin/InventoryPage/components/InventoryCard.jsx
 import { useState, useEffect } from 'react';
 import { ChevronDown, Edit3 } from 'lucide-react';
-import { BaseProductCard } from '../../../../components/BaseProductCard'; // <-- Make sure path is correct!
+import { BaseProductCard } from '../../../../components/BaseProductCard';
 
 export const InventoryCard = ({ product, onEditPTR }) => {
   const [expanded, setExpanded] = useState(false);
@@ -10,11 +11,17 @@ export const InventoryCard = ({ product, onEditPTR }) => {
     if (!expanded) setBatchExpanded(null);
   }, [expanded]);
 
+  const isExpired = (dateString) => {
+    if (!dateString) return false;
+    return (new Date(dateString) - new Date()) <= 0;
+  };
+
   const getExpiryColors = (dateString, threshold = 90) => {
     if (!dateString) return 'text-slate-600 bg-slate-50 border-slate-200';
+    if (isExpired(dateString)) return 'text-red-700 bg-red-100 border-red-300 font-black';
+
     const days = (new Date(dateString) - new Date()) / (1000 * 60 * 60 * 24);
-    if (days < 30) return 'text-red-700 bg-red-100 border-red-200';
-    if (days < 60) return 'text-orange-700 bg-orange-100 border-orange-200';
+    if (days < 30) return 'text-orange-700 bg-orange-100 border-orange-200';
     if (days <= threshold) return 'text-amber-700 bg-amber-100 border-amber-200';
     return 'text-emerald-700 bg-emerald-100 border-emerald-200';
   };
@@ -22,11 +29,15 @@ export const InventoryCard = ({ product, onEditPTR }) => {
   const isNearExpiry = (dateString, threshold = 90) => {
     if (!dateString) return false;
     const days = (new Date(dateString) - new Date()) / (1000 * 60 * 60 * 24);
-    return days <= threshold;
+    return days > 0 && days <= threshold; 
   };
   
   const batches = product.batches || [];
+  const hasExpired = batches.some(b => isExpired(b.expiryDate));
   const hasNearExpiry = batches.some(b => isNearExpiry(b.expiryDate, b.shortExpiryThreshold));
+
+  // ✨ FIX: Calculate the sum of ONLY the batches currently inside this card
+  const activeDisplayStock = batches.reduce((sum, batch) => sum + (batch.totalStockQuantity || 0), 0);
 
   return (
     <BaseProductCard
@@ -34,14 +45,13 @@ export const InventoryCard = ({ product, onEditPTR }) => {
       expanded={expanded}
       onToggle={() => setExpanded(!expanded)}
       hasNearExpiry={hasNearExpiry}
+      hasExpired={hasExpired} 
+      displayStock={activeDisplayStock} // ✨ FIX: Pass the math down!
     >
-      <div
-        className={`overflow-hidden transition-all duration-300 ease-in-out ${expanded ? 'max-h-500 opacity-100' : 'max-h-0 opacity-0'
-          }`}
-      >
+      <div className={`overflow-hidden transition-all duration-300 ease-in-out ${expanded ? 'max-h-500 opacity-100' : 'max-h-0 opacity-0'}`}>
         <div className="border-t border-slate-100 px-3 py-3 bg-slate-50 space-y-2">
           <p className="text-md md:text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">
-            Active Batches ({batches.length})
+            {hasExpired ? `Expired Batches (${batches.length})` : `Active Batches (${batches.length})`}
           </p>
 
           {batches.length === 0 ? (
@@ -55,11 +65,15 @@ export const InventoryCard = ({ product, onEditPTR }) => {
                 : 'N/A';
 
               const batchNearExp = isNearExpiry(batch.expiryDate, batch.shortExpiryThreshold);
+              const batchExpired = isExpired(batch.expiryDate);
+
               return (
                 <div 
                   key={batch._id || bi} 
                   className={`rounded-xl border overflow-hidden transition-all shadow-sm ${
-                    batchNearExp ? 'border-orange-200 bg-orange-50/50' : 'border-slate-200 bg-white'
+                    batchExpired ? 'border-red-300 bg-red-50/50' : 
+                    batchNearExp ? 'border-orange-200 bg-orange-50/50' : 
+                    'border-slate-200 bg-white'
                   }`}
                 >
                   <button 
@@ -71,7 +85,7 @@ export const InventoryCard = ({ product, onEditPTR }) => {
                         Batch: {batch.batchNumber}
                       </span>
                       <span className={`text-sm md:text-xs font-mono px-1 py-0.5 rounded border ${getExpiryColors(batch.expiryDate, batch.shortExpiryThreshold)}`}>
-                        Exp: {formattedExpiry}
+                        {batchExpired ? `EXPIRED: ${formattedExpiry}` : `Exp: ${formattedExpiry}`}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 ml-2">
@@ -84,10 +98,7 @@ export const InventoryCard = ({ product, onEditPTR }) => {
                     </div>
                   </button>
 
-                  <div
-                    className={`overflow-hidden transition-all duration-300 ease-in-out ${batchExpanded === bi ? 'max-h-200 opacity-100' : 'max-h-0 opacity-0'
-                      }`}
-                  >
+                  <div className={`overflow-hidden transition-all duration-300 ease-in-out ${batchExpanded === bi ? 'max-h-200 opacity-100' : 'max-h-0 opacity-0'}`}>
                     <div className="px-2 pb-2 space-y-3 border-t border-slate-100 pt-2 bg-slate-50/30">
                       <div className="grid grid-cols-3 gap-2">
                         <div className="bg-white rounded-lg px-1.5 py-1.5 text-center border border-slate-200 shadow-sm">

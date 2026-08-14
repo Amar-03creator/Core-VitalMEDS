@@ -1,184 +1,4 @@
-// import { useEffect, useMemo, useState, useCallback } from 'react';
-// import { toast } from 'sonner';
-// import { Search, Tag, Plus, Loader2, ChevronDown, Filter, AlertOctagon } from 'lucide-react';
-// import CreateOfferModal from '../../features/Admin/OffersPage/CreateOfferModal';
-// import BatchCard from '../../features/Admin/OffersPage/BatchCard';
-// import { api } from '../../services/api';
-
-// export default function OffersPage() {
-//   const [offerStatus, setOfferStatus] = useState('active'); // active, inactive, no_offer
-//   const [expiryFilter, setExpiryFilter] = useState('all'); // 'all', 1, 2, 3, 6
-//   const [offerToDelete, setOfferToDelete] = useState(null);
-  
-//   const [batches, setBatches] = useState([]);
-//   const [loading, setLoading] = useState(true);
-//   const [search, setSearch] = useState('');
-
-//   const [showOfferModal, setShowOfferModal] = useState(false);
-//   const [prefillBatch, setPrefillBatch] = useState(null);
-
-//   const fetchOffersData = useCallback(async () => {
-//     setLoading(true);
-//     try {
-//       const res = await api.getOffersList(offerStatus, expiryFilter);
-//       setBatches(res.data || []);
-//     } catch (err) {
-//       toast.error("Failed to fetch offers data");
-//     } finally {
-//       setLoading(false);
-//     }
-//   }, [offerStatus, expiryFilter]);
-
-//   useEffect(() => {
-//     fetchOffersData();
-//     const interval = setInterval(() => { fetchOffersData(); }, 60000);
-//     const onFocus = () => fetchOffersData();
-    
-//     window.addEventListener('focus', onFocus);
-//     return () => {
-//       clearInterval(interval);
-//       window.removeEventListener('focus', onFocus);
-//     };
-//   }, [fetchOffersData]);
-
-//   const handleStatusChange = (e) => {
-//     setOfferStatus(e.target.value);
-//     setExpiryFilter('all'); // Auto-reset expiry when changing status tab
-//   };
-
-// const handleToggleStatus = async (batch) => {
-//     try {
-//       const newStatus = !batch.offer.isActive;
-//       await api.updateBatchOffer(batch.id, { offer: { ...batch.offer, isActive: newStatus } });
-//       toast.success(newStatus ? "Offer Activated!" : "Offer Suspended.");
-//       fetchOffersData();
-//     } catch (err) {
-//       toast.error(err.message || "Failed to update status"); // Will show the 1-per-day error
-//     }
-//   };
-
-//   const handleDeleteOffer = async (batchId) => {
-//     if (!window.confirm("Are you sure you want to completely delete this offer?")) return;
-//     try {
-//       await api.updateBatchOffer(batchId, { action: 'delete' }); 
-//       toast.success("Offer deleted permanently.");
-//       fetchOffersData();
-//     } catch (err) {
-//       toast.error(err.message || "Failed to delete offer");
-//     }
-//   };
-
-//   const displayBatches = useMemo(() => {
-//     let filtered = batches;
-//     if (search.trim()) {
-//       const s = search.toLowerCase();
-//       filtered = filtered.filter((b) =>
-//         (b.productName && b.productName.toLowerCase().includes(s)) ||
-//         (b.companyShortCode && b.companyShortCode.toLowerCase().includes(s)) ||
-//         (b.batchNumber && b.batchNumber.toLowerCase().includes(s))
-//       );
-//     }
-//     return filtered;
-//   }, [batches, search]);
-
-//   return (
-//     <>
-//       <div className="mx-auto max-w-5xl space-y-5 px-3 py-6">
-        
-//         {/* Header */}
-//         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-//           <div>
-//             <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2">
-//               <Tag className="text-emerald-500" size={24} /> Offers & Liquidation
-//             </h1>
-//             <p className="mt-1 text-sm font-semibold text-slate-500">Manage schemes, drafts, and short-expiry liquidations.</p>
-//           </div>
-//           <button
-//             onClick={() => { setPrefillBatch(null); setShowOfferModal(true); }}
-//             className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-5 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 text-sm shrink-0"
-//           >
-//             <Plus size={18} strokeWidth={3} /> Make Custom Offer
-//           </button>
-//         </div>
-
-//         {/* Master Filter Bar */}
-//         <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
-          
-//           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-//             <div className="flex items-center gap-2">
-//               <Filter size={16} className="text-slate-400"/>
-//               <div className="relative">
-//                 <select value={offerStatus} onChange={handleStatusChange} className="appearance-none bg-slate-50 border border-slate-200 text-slate-800 text-sm font-black py-2 pl-3 pr-8 rounded-lg focus:outline-none focus:border-emerald-500 cursor-pointer">
-//                   <option value="active">Active Offers</option>
-//                   <option value="inactive">Inactive / Drafts</option>
-//                   <option value="no_offer">No Offer</option>
-//                 </select>
-//                 <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-//               </div>
-//             </div>
-
-//             <div className="flex items-center gap-2">
-//               <span className="text-sm font-bold text-slate-400">Expiring:</span>
-//               <div className="relative">
-//                 <select value={expiryFilter} onChange={(e) => setExpiryFilter(e.target.value)} className="appearance-none bg-slate-50 border border-slate-200 text-slate-800 text-sm font-black py-2 pl-3 pr-8 rounded-lg focus:outline-none focus:border-emerald-500 cursor-pointer">
-//                   <option value="all">Any Date</option>
-//                   <option value="1">≤ 1 Month</option>
-//                   <option value="3">≤ 3 Months</option>
-//                   <option value="6">≤ 6 Months</option>
-//                 </select>
-//                 <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-//               </div>
-//             </div>
-//           </div>
-
-//           <div className="relative w-full md:w-72">
-//             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-//             <input
-//               value={search} onChange={(e) => setSearch(e.target.value)}
-//               placeholder="Search batches..."
-//               className="w-full rounded-xl border border-slate-200 bg-white px-9 py-2 text-sm font-semibold outline-none focus:border-emerald-500 transition-all"
-//             />
-//           </div>
-//         </div>
-
-//         {/* List */}
-//         <div className="space-y-3">
-//           {loading ? (
-//             <div className="flex justify-center items-center py-16">
-//               <Loader2 size={28} className="animate-spin text-emerald-500" />
-//             </div>
-//           ) : displayBatches.length === 0 ? (
-//             <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-300">
-//               <p className="text-slate-500 font-bold text-base">No batches found for this criteria.</p>
-//             </div>
-//           ) : (
-//             displayBatches.map((batch, index) => (
-//               <BatchCard
-//                 key={batch.id}
-//                 batch={batch}
-//                 index={index}
-//                 onOpenModal={(b) => { setPrefillBatch(b); setShowOfferModal(true); }}
-//                 onToggleStatus={handleToggleStatus}
-//                 onDeleteOffer={handleDeleteOffer}
-//               />
-//             ))
-//           )}
-//         </div>
-//       </div>
-
-//       {showOfferModal && (
-//         <CreateOfferModal
-//           isOpen={showOfferModal}
-//           onClose={() => setShowOfferModal(false)}
-//           prefillBatch={prefillBatch}
-//           onSave={fetchOffersData}
-//         />
-//       )}
-//     </>
-//   );
-// }
-
-
+// src/pages/Admin/OffersPage.jsx
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Search, Tag, Plus, Loader2, ChevronDown, Filter, AlertOctagon, XCircle } from 'lucide-react';
@@ -271,14 +91,14 @@ export default function OffersPage() {
         
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2">
+            <h1 className="text-3xl font-black text-slate-900 flex items-center gap-2">
               <Tag className="text-emerald-500" size={24} /> Offers & Liquidation
             </h1>
-            <p className="mt-1 text-sm font-semibold text-slate-500">Manage schemes, drafts, and short-expiry liquidations.</p>
+            <p className="mt-1 text-base font-medium text-slate-500">Manage schemes, drafts, and short-expiry liquidations.</p>
           </div>
           <button
             onClick={() => { setPrefillBatch(null); setShowOfferModal(true); }}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-5 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 text-sm shrink-0"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-5 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 text-base shrink-0"
           >
             <Plus size={18} strokeWidth={3} /> Make Custom Offer
           </button>
@@ -292,7 +112,7 @@ export default function OffersPage() {
                 <select 
                   value={offerStatus} 
                   onChange={(e) => setOfferStatus(e.target.value)} 
-                  className="appearance-none bg-slate-50 border border-slate-200 text-slate-800 text-sm font-black py-2 pl-3 pr-8 rounded-lg focus:outline-none focus:border-emerald-500 cursor-pointer"
+                  className="appearance-none bg-slate-50 border border-slate-200 text-slate-800 text-base font-black py-2 pl-3 pr-6 rounded-lg focus:outline-none focus:border-emerald-500 cursor-pointer"
                 >
                   {/* ✨ FIX: Disabled if 'Any Date' is selected */}
                   <option value="all" disabled={expiryFilter === 'all'}>All Batches</option>
@@ -305,12 +125,12 @@ export default function OffersPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-slate-400">Expiring:</span>
+              <span className="text-base font-bold text-slate-400">Expiring:</span>
               <div className="relative">
                 <select 
                   value={expiryFilter} 
                   onChange={(e) => setExpiryFilter(e.target.value)} 
-                  className="appearance-none bg-slate-50 border border-slate-200 text-slate-800 text-sm font-black py-2 pl-3 pr-8 rounded-lg focus:outline-none focus:border-emerald-500 cursor-pointer"
+                  className="appearance-none bg-slate-50 border border-slate-200 text-slate-800 text-base font-black py-2 pl-3 pr-6 rounded-lg focus:outline-none focus:border-emerald-500 cursor-pointer"
                 >
                   {/* ✨ FIX: Disabled if 'All Batches' is selected */}
                   <option value="all" disabled={offerStatus === 'all'}>Any Date</option>
@@ -326,7 +146,7 @@ export default function OffersPage() {
             {(offerStatus !== 'all' || expiryFilter !== '6' || search) && (
               <button 
                 onClick={clearFilters}
-                className="flex items-center gap-1.5 px-3 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-bold hover:bg-red-100 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 bg-red-50 text-red-600 rounded-lg text-base font-bold hover:bg-red-100 transition-colors"
               >
                 <XCircle size={14} /> Clear
               </button>
@@ -338,12 +158,12 @@ export default function OffersPage() {
             <input
               value={search} onChange={(e) => setSearch(e.target.value)}
               placeholder="Search batches..."
-              className="w-full rounded-xl border border-slate-200 bg-white px-9 py-2 text-sm font-semibold outline-none focus:border-emerald-500 transition-all"
+              className="w-full rounded-xl border border-slate-200 bg-white px-9 py-2 text-base font-semibold outline-none focus:border-emerald-500 transition-all"
             />
           </div>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-5">
           {loading ? (
             <div className="flex justify-center items-center py-16">
               <Loader2 size={28} className="animate-spin text-emerald-500" />

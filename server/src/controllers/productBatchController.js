@@ -7,7 +7,6 @@ const SalesInvoice = require('../models/SalesInvoice');
 const Order = require('../models/Order');
 
 /* ── 1. Original: Get Products With Batches (Used for PDF Export & Catalog) ── */
-// exports.getProductsWithBatches = async (req, res) => {
 //   try {
 //     const products = await Product.find({}).populate('companyId', 'shortCode').lean();
 //     const productIds = products.map(p => p._id);
@@ -162,7 +161,7 @@ exports.getProductsWithBatches = async (req, res) => {
     const enriched = await Promise.all(
       products.map(async (product) => {
         const pIdStr = String(product._id);
-        const batches = await Batch.find({ productId: product._id })
+        const batches = await Batch.find({ productId: product._id, isActive: true })
           .select('batchNumber mrp expiryDate totalStockQuantity offer')
           .lean();
 
@@ -429,12 +428,40 @@ exports.getOffersList = async (req, res) => {
     const { status = 'all', months = '6' } = req.query;
     const now = new Date();
 
-    let matchQuery = { totalStockQuantity: { $gt: 0 } };
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+    // Rule A: Alive (Hasn't expired yet)
+    const aliveRule = { expiryDate: { $gte: today } };
+
+    // Rule B: The Graveyard (Expired < 30 days ago AND has an offer)
+    const graveyardRule = {
+      expiryDate: { $gte: thirtyDaysAgo, $lt: today },
+      'offer.description': { $exists: true, $ne: '', $type: 'string' }
+    };
+
+    // ✨ THE FIX: The "Intent" Bouncer
+    // Clients strictly request 'active'. Admins request 'all' or 'inactive'.
+    // Expired offers are inherently NOT active. So we only allow the graveyard 
+    // when the status allows for inactive items!
+    const allowGraveyard = (status === 'all' || status === 'inactive');
+    
+    let dateFilter = allowGraveyard ? { $or: [aliveRule, graveyardRule] } : aliveRule;
+
+    let matchQuery = { 
+      totalStockQuantity: { $gt: 0 },
+      $and: [ dateFilter ]
+    };
 
     if (months !== 'all') {
       const thresholdDate = new Date();
       thresholdDate.setMonth(thresholdDate.getMonth() + parseInt(months));
-      matchQuery.expiryDate = { $lte: thresholdDate };
+      // Safely push to $and array
+      matchQuery.$and.push({ expiryDate: { $lte: thresholdDate } });
     }
 
     if (status === 'active') {
@@ -442,22 +469,24 @@ exports.getOffersList = async (req, res) => {
       matchQuery['offer.startDate'] = { $lte: now };
     }
     else if (status === 'inactive') {
-      matchQuery.$or = [
-        { 'offer.isActive': false, 'offer.description': { $ne: '' } },
-        { 'offer.isActive': true, 'offer.startDate': { $gt: now } }
-      ];
+      matchQuery.$and.push({
+        $or: [
+          { 'offer.isActive': false, 'offer.description': { $ne: '' } },
+          { 'offer.isActive': true, 'offer.startDate': { $gt: now } }
+        ]
+      });
     }
     else if (status === 'no_offer') {
-      matchQuery.$or = [
-        { offer: { $exists: false } },
-        { offer: null },
-        { 'offer.description': '' },
-        { 'offer.description': null }
-      ];
+      matchQuery.$and.push({
+        $or: [
+          { offer: { $exists: false } },
+          { offer: null },
+          { 'offer.description': '' },
+          { 'offer.description': null }
+        ]
+      });
     }
 
-    // ✨ FIX: Added .populate('productId') to fetch images, descriptions, and categories
-    // Inside getOffersList...
     const batches = await Batch.find(matchQuery)
       .populate('companyId', 'shortCode')
       .populate('productId')
@@ -489,7 +518,6 @@ exports.getOffersList = async (req, res) => {
         description: prod.description,
         usageTips: prod.usageTips,
 
-        // ✨ ADDED: Now the Offers page won't have the math bug either!
         totalStock: prod.totalStock || 0,
         shortExpiryThreshold: prod.shortExpiryThreshold || 90,
         lowStockThreshold: prod.lowStockThreshold || 50,
