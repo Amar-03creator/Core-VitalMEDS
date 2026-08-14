@@ -1,3 +1,4 @@
+// src/pages/Admin/ProductsPage.jsx
 import { useState, useEffect, useRef } from 'react';
 import { Package, Search, Plus, Printer, Download, Filter, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';

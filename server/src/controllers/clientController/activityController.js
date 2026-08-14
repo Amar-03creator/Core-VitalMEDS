@@ -28,9 +28,32 @@ exports.getClientPayments = async (req, res) => {
 
 exports.getClientOrders = async (req, res) => {
   try {
-    const orders = await Order.find({ clientId: req.params.id }).sort({ createdAt: -1 });
+    const clientId = req.params.id;
+
+    if (!clientId) {
+      return res.status(400).json({ success: false, message: 'Client ID is required' });
+    }
+
+    const orders = await Order.find({ clientId: clientId })
+      .sort({ createdAt: -1 })
+      // 1. Populates the Product Name & Company
+      .populate({
+        path: 'items.productId',
+        select: 'name mrp fallbackMrp companyId company', 
+        populate: { 
+          path: 'companyId', 
+          select: 'name shortCode' 
+        }
+      })
+      // ✨ 2. NEW FIX: Populates the Batch to reveal MRP and Expiry Date!
+      .populate({
+        path: 'items.plannedBatches.batchId',
+        select: 'batchNumber mrp expiryDate expiry'
+      });
+
     res.json({ success: true, data: orders });
   } catch (err) {
+    console.error("getClientOrders Error:", err);
     res.status(500).json({ message: err.message });
   }
 };

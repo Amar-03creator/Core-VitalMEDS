@@ -45,19 +45,19 @@ export const QuickActions = () => {
           <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center">
             <FileText size={18} className="text-white" />
           </div>
-          <span className="text-slate-700 text-xs font-medium text-center leading-tight">New Invoice</span>
+          <span className="text-slate-700 text-sm font-medium text-center leading-tight">New Invoice</span>
         </button>
         <button onClick={() => setShowPurchaseModal(true)} className="flex flex-col items-center gap-2 bg-white border border-slate-200 rounded-2xl p-4 active:scale-95 transition-transform">
           <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center">
             <Package size={18} className="text-white" />
           </div>
-          <span className="text-slate-700 text-xs font-medium text-center leading-tight">Add Stock</span>
+          <span className="text-slate-700 text-sm font-medium text-center leading-tight">Add Stock</span>
         </button>
         <button onClick={() => setShowPaymentModal(true)} className="flex flex-col items-center gap-2 bg-white border border-slate-200 rounded-2xl p-4 active:scale-95 transition-transform">
           <div className="w-10 h-10 bg-violet-500 rounded-xl flex items-center justify-center">
             <Wallet size={18} className="text-white" />
           </div>
-          <span className="text-slate-700 text-xs font-medium text-center leading-tight">Record Pymt</span>
+          <span className="text-slate-700 text-sm font-medium text-center leading-tight">Record Payment</span>
         </button>
       </div>
 

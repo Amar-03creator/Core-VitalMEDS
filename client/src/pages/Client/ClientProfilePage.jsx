@@ -17,6 +17,9 @@ const TABS = [
 
 const ClientProfilePage = () => {
   const { authAxios } = useAuth();
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
   const [activeTab, setActiveTab] = useState('profile');
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);

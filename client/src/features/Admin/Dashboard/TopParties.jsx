@@ -17,9 +17,9 @@ export const TopParties = ({ data }) => {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
       <div className="px-4 py-3.5 border-b border-slate-100 flex items-center justify-between">
-        <h2 className="text-slate-800 font-semibold text-base flex items-center gap-2"><Users size={16} className="text-slate-500" /> Top Parties</h2>
+        <h2 className="text-slate-800 font-semibold text-xl flex items-center gap-2"><Users size={20} className="text-slate-500" /> Top Parties</h2>
         <div className="relative">
-          <button onClick={() => setPartySortOpen(o => !o)} className="flex items-center gap-1.5 text-slate-600 text-xs font-semibold bg-slate-100 px-3 py-1.5 rounded-xl">
+          <button onClick={() => setPartySortOpen(o => !o)} className="flex items-center gap-1.5 text-slate-600 text-sm font-semibold bg-slate-100 px-3 py-1.5 rounded-xl">
             {partySortLabels[partySort]} <ChevronDown size={13} className={`transition-transform ${partySortOpen ? 'rotate-180' : ''}`} />
           </button>
           {partySortOpen && (
@@ -42,26 +42,26 @@ export const TopParties = ({ data }) => {
               <p className="text-slate-900 text-base font-bold truncate">{name}</p>
               <div className="flex items-center gap-2.5 mt-1">
                 {/* ✨ FIX: Increased Tier badge size */}
-                <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${tierColorsLight[tier]}`}>{tier}</span>
+                <span className={`text-sm font-bold px-2 py-0.5 rounded-md ${tierColorsLight[tier]}`}>{tier}</span>
                 <div className="flex items-center gap-1.5">
                   <div className="w-16 h-2 bg-slate-100 rounded-full overflow-hidden">
                     <div className={`h-full rounded-full ${score >= 80 ? 'bg-emerald-500' : score >= 50 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${score}%` }} />
                   </div>
                   {/* ✨ FIX: Increased Score text size */}
-                  <span className="text-xs font-medium text-slate-500">{score}</span>
+                  <span className="text-sm font-medium text-slate-500">{score}</span>
                 </div>
               </div>
             </div>
             <div className="text-right shrink-0">
               <p className="text-slate-800 text-base font-bold">{value}</p>
               {/* ✨ FIX: Increased Meta text size */}
-              <p className="text-slate-500 text-xs font-medium mt-0.5">{meta}</p>
+              <p className="text-slate-500 text-sm font-medium mt-0.5">{meta}</p>
             </div>
           </div>
         ))}
       </div>
       <div className="px-4 py-3 border-t border-slate-100">
-        <Link to="/admin-dashboard/customers" className="text-emerald-600 text-sm font-semibold flex items-center gap-1">View all customers <ArrowRight size={13} /></Link>
+        <Link to="/admin-dashboard/customers" className="text-emerald-600 text-base- font-semibold flex items-center gap-1">View all customers <ArrowRight size={13} /></Link>
       </div>
     </div>
   );

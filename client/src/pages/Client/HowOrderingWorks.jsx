@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { 
   ShieldCheck, 
   MessageSquareText, 
@@ -11,6 +11,9 @@ import {
 } from 'lucide-react';
 
 const HowOrderingWorks = () => {
+  useEffect(() => {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}, []);
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
       {/* Header */}

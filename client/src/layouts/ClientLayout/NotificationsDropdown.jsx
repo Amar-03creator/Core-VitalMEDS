@@ -82,7 +82,7 @@ export const NotificationsDropdown = ({ onClose, notifications = [], onRefresh }
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className={`text-sm truncate ${isUnread ? 'font-bold text-slate-900' : 'font-semibold text-slate-700'}`}>{notif.title}</p>
-                  <p className="text-slate-500 text-[12px] mt-0.5 leading-snug line-clamp-2">{notif.message}</p>
+                  <p className="text-slate-500 text-xs mt-0.5 leading-snug line-clamp-3">{notif.message}</p>
                   <div className="flex items-center justify-between mt-1">
                     <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">{timeAgo(notif.createdAt)}</p>
                   </div>

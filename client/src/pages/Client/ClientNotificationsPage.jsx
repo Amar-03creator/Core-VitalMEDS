@@ -21,6 +21,9 @@ const filterTabs = ['All', 'Unread', 'Orders', 'Payments', 'Alerts'];
 
 const NotificationCard = ({ notif, onMarkRead }) => {
   const navigate = useNavigate();
+  useEffect(() => {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}, []);
   const cfg = typeConfig[notif.type] || typeConfig.default;
   const Icon = cfg.icon;
 
@@ -40,10 +43,10 @@ const NotificationCard = ({ notif, onMarkRead }) => {
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <p className="text-slate-900 text-sm font-bold truncate">{notif.title}</p>
+                <p className="text-slate-900 text-base font-bold truncate">{notif.title}</p>
                 {!notif.isRead && <span className={`w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} />}
               </div>
-              <span className="text-slate-400 text-xs font-semibold shrink-0">
+              <span className="text-slate-400 text-sm font-semibold shrink-0">
                 {new Date(notif.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
               </span>
             </div>
@@ -120,17 +123,27 @@ const ClientNotificationsPage = () => {
   return (
     <div className="px-4 py-6 space-y-5 max-w-3xl mx-auto">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div>
-            <h1 className="text-slate-900 text-xl font-black">Notifications</h1>
-            <p className="text-slate-500 text-sm font-semibold mt-0.5">Your updates from Mila Agencies</p>
-          </div>
-          {unreadCount > 0 && (
-            <span className="bg-red-500 text-white text-xs font-black px-2 py-0.5 rounded-full ml-1">{unreadCount}</span>
-          )}
+        
+        {/* Title Block */}
+        <div>
+          <h1 className="text-slate-900 text-3xl font-black tracking-tight flex items-start">
+            Notifications
+            {unreadCount > 0 && (
+              <span className="bg-red-500 text-white text-sm font-black px-2 py-0.5 rounded-full ml-1.5 -mt-1.5 shadow-sm leading-none">
+                {unreadCount}
+              </span>
+            )}
+          </h1>
+          <p className="text-slate-500 text-base font-medium mt-0.5">Alerts and Events</p>
         </div>
+
+        {/* Action Button */}
         {unreadCount > 0 && (
-          <button onClick={handleMarkAllRead} className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-xl hover:bg-emerald-100 transition-colors active:scale-95">
+          <button 
+            onClick={handleMarkAllRead} 
+            className="flex items-center gap-1.5 text-sm font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-xl hover:bg-emerald-100 transition-colors active:scale-95 shrink-0"
+          >
+            {/* ✨ FIX: Removed the "hidden" class so the text always shows! */}
             <CheckCircle2 size={14} /> Mark all read
           </button>
         )}

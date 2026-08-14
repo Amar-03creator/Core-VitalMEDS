@@ -5,7 +5,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { ChevronLeft, ChevronRight, ArrowRight, Building2, User, FileText, MapPin } from 'lucide-react';
 
-import RegistrationTopBar from '../../features/Common/Registration/RegistrationTopBar';
 import StepProgress from '../../features/Common/Registration/StepProgress';
 import BusinessStep from '../../features/Common/Registration/Steps/BusinessStep';
 import DocumentsStep from '../../features/Common/Registration/Steps/DocumentsStep';
@@ -14,6 +13,7 @@ import AddressStep from '../../features/Common/Registration/Steps/AddressStep';
 import OtpModal from '../../features/Common/Registration/OtpModal';
 import SuccessState from '../../features/Common/Registration/SuccessState';
 import LegalModal from '../../features/Common/Registration/LegalModal';
+import Navbar from '@/layouts/common/Navbar';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
@@ -200,7 +200,7 @@ const RegisterPage = () => {
         />
       )}
 
-      <RegistrationTopBar />
+      <Navbar />
       <StepProgress currentStep={currentStep} steps={STEPS} />
 
       <div className="flex-1 px-5 py-6 max-w-md mx-auto w-full">

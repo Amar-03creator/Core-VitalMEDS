@@ -1,40 +1,55 @@
 // src/layouts/AdminLayout/TopNav.jsx
 import { useState, useEffect, useCallback } from 'react';
-import { Pill, MessageSquare, Bell } from 'lucide-react';
+import { Pill, Bell } from 'lucide-react';
 import { HamburgerButton } from './components/HamburgerButton';
 import { NotificationsDropdown } from './components/NotificationsDropdown';
-import { MessagesDropdown } from './components/MessagesDropdown';
-import { demoTickets } from './constants'; // Keep tickets demo for now
 import { api } from '../../services/api';
 
-export const TopNav = ({ menuOpen, setMenuOpen, notifOpen, setNotifOpen, messagesOpen, setMessagesOpen }) => {
+export const TopNav = ({ menuOpen, setMenuOpen, notifOpen, setNotifOpen }) => {
   const [notifications, setNotifications] = useState([]);
   
-  // Real Notification Fetching
-  const fetchNotifs = useCallback(async () => {
+  // ✨ NEW: State to hold the dynamic portal name
+  const [portalName, setPortalName] = useState('Admin Portal');
+
+  // ✨ Fetch Initial Data (Notifications + Profile Role)
+  const fetchInitialData = useCallback(async () => {
     try {
-      // By default, this gets the latest 50-100 notifications for the admin
-      const res = await api.getAdminNotifications();
-      if (res.data) setNotifications(res.data);
+      // 1. Fetch Notifications
+      const notifRes = await api.getAdminNotifications();
+      if (notifRes.data) setNotifications(notifRes.data);
+
+      // 2. Fetch Profile to determine who is logged in
+      const profileRes = await api.getAdminProfile();
+      if (profileRes.data?.sessionRole) {
+        const role = profileRes.data.sessionRole;
+        if (role === 'COMPETENT_PERSON') setPortalName('CP Portal');
+        else if (role === 'PROPRIETOR') setPortalName('Proprietor Portal');
+        else if (role === 'DUAL_OWNER') setPortalName('Owner Portal');
+        else setPortalName('System Admin');
+      }
     } catch (err) {
-      console.error("Failed to load topnav notifications", err);
+      console.error("Failed to load topnav data", err);
     }
   }, []);
 
   useEffect(() => {
-    fetchNotifs();
+    // Run the initial fetch for both profile and notifications
+    fetchInitialData();
     
-    // ✨ Smart Polling: Automatically check for new notifications every 30 seconds
-    const interval = setInterval(() => {
-      fetchNotifs();
+    // ✨ Smart Polling: Only poll notifications every 30s (we don't need to poll the profile!)
+    const interval = setInterval(async () => {
+      try {
+        const res = await api.getAdminNotifications();
+        if (res.data) setNotifications(res.data);
+      } catch (err) {
+        console.error("Polling failed", err);
+      }
     }, 30000); 
 
     return () => clearInterval(interval);
-  }, [fetchNotifs]);
+  }, [fetchInitialData]);
 
   const totalUnreadNotif = notifications.filter(n => !n.isRead).length;
-  const totalUnreadTickets = demoTickets.filter(t => t.unread).length;
-
   return (
     <nav data-app-top-nav className="sticky top-0 z-[70] bg-slate-900 shadow-md">
       <div className="flex items-center justify-between px-4 py-3">
@@ -44,7 +59,10 @@ export const TopNav = ({ menuOpen, setMenuOpen, notifOpen, setNotifOpen, message
           </div>
           <div>
             <p className="text-white font-bold text-base leading-none tracking-tight">CoreVital MEDS</p>
-            <p className="text-emerald-400 text-xs font-semibold tracking-widest uppercase mt-0.5">Admin Portal</p>
+            {/* ✨ Dynamically render the portal name based on sessionRole */}
+            <p className="text-emerald-400 text-xs font-semibold tracking-widest uppercase mt-0.5">
+              {portalName}
+            </p>
           </div>
         </div>
 
@@ -53,7 +71,12 @@ export const TopNav = ({ menuOpen, setMenuOpen, notifOpen, setNotifOpen, message
           {/* Notifications button */}
           <div className="relative">
             <button
-              onClick={() => { setNotifOpen(o => !o); setMessagesOpen(false); setMenuOpen(false); fetchNotifs(); }}
+              onClick={() => { 
+                setNotifOpen(o => !o); 
+                setMenuOpen(false); 
+                // Fetch fresh notifications when opened
+                api.getAdminNotifications().then(res => setNotifications(res.data)).catch(console.error); 
+              }}
               className={`relative p-2.5 rounded-xl transition-colors ${notifOpen ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
             >
               <Bell size={24} />
@@ -66,7 +89,10 @@ export const TopNav = ({ menuOpen, setMenuOpen, notifOpen, setNotifOpen, message
             {notifOpen && (
               <NotificationsDropdown 
                 notifications={notifications} 
-                onRefresh={fetchNotifs} // Allows dropdown to tell TopNav to update the red badge
+                onRefresh={async () => {
+                  const res = await api.getAdminNotifications();
+                  if (res.data) setNotifications(res.data);
+                }}
                 onClose={() => setNotifOpen(false)} 
               />
             )}

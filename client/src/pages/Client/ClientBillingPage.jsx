@@ -1,5 +1,5 @@
 // src/pages/Client/ClientBillingPage.jsx
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useCurrentClient } from '../../hooks/useCurrentClient';
 import SummaryTab from '../../features/Client/BillingPage/tabs/SummaryTab';
 import InvoicesTab from '../../features/Client/BillingPage/tabs/InvoicesTab';
@@ -18,12 +18,15 @@ const TABS = [
 const ClientBillingPage = () => {
   const { client, loading, error, refetch } = useCurrentClient();
   const [activeTab, setActiveTab] = useState('summary');
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
 
   return (
     <div className="max-w-3xl mx-auto">
       <div className="px-4 sm:px-6 pt-5 pb-2">
-        <h1 className="text-slate-900 text-2xl sm:text-3xl font-bold">Billing</h1>
-        <p className="text-slate-500 text-base sm:text-lg mt-0.5">Your invoices, payments, and account ledger</p>
+        <h1 className="text-slate-900 text-3xl font-black tracking-tight">Billing</h1>
+        <p className="text-slate-500 text-base font-medium">Your invoices, payments, and account ledger</p>
       </div>
 
       <div className="flex border-b border-slate-200 bg-white sticky top-0 z-10 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
@@ -31,9 +34,8 @@ const ClientBillingPage = () => {
           <button
             key={key}
             onClick={() => setActiveTab(key)}
-            className={`px-5 py-3 text-base sm:text-lg font-semibold whitespace-nowrap border-b-2 transition-colors shrink-0 ${
-              activeTab === key ? 'text-slate-900 border-slate-900' : 'text-slate-400 border-transparent'
-            }`}
+            className={`px-5 py-3 text-base sm:text-lg font-semibold whitespace-nowrap border-b-2 transition-colors shrink-0 ${activeTab === key ? 'text-slate-900 border-slate-900' : 'text-slate-400 border-transparent'
+              }`}
           >
             {label}
           </button>

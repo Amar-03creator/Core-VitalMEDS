@@ -1,10 +1,8 @@
-// pages/Admin/AdminSettingsPage.jsx
 import { useState, useEffect, useCallback } from 'react';
 import { UserCircle2, ScrollText, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
-
 
 import AdminProfileTab from '../../features/Admin/Settings/AdminProfileTab';
 import LegalInfoTab from '../../features/Admin/Settings/LegalInfoTab'; 
@@ -47,10 +45,10 @@ const AdminSettingsPage = () => {
   }
 
   return (
-    <div className="px-4 py-5 space-y-5 max-w-2xl mx-auto">
+    <div className="px-4 py-5 space-y-5 max-w-3xl mx-auto">
       <div>
         <h1 className="text-slate-900 text-2xl font-bold">Settings</h1>
-        <p className="text-slate-500 text-sm mt-0.5">{admin.businessName}</p>
+        <p className="text-slate-500 text-sm mt-0.5">{admin.establishmentName || 'Admin Settings'}</p>
       </div>
 
       <div className="flex gap-1.5 bg-slate-100 rounded-xl p-1">

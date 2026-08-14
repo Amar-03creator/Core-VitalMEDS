@@ -7,7 +7,6 @@ import { TopParties } from '../../features/Admin/Dashboard/TopParties';
 import { ConcernedParties } from '../../features/Admin/Dashboard/ConcernedParties';
 import { TopProducts } from '../../features/Admin/Dashboard/TopProducts';
 import { Spinner } from '@/components/ui/spinner';
-// ★ Added Calculator and RefreshCw icons for the new button
 import { Calculator, RefreshCw } from 'lucide-react'; 
 import { toast } from 'sonner';
 
@@ -15,13 +14,16 @@ const AdminDashboard = () => {
   const [period, setPeriod] = useState('month');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isAuditing, setIsAuditing] = useState(false); // ★ New state for the audit button
+  const [isAuditing, setIsAuditing] = useState(false);
 
   const now = new Date();
   const greeting = now.getHours() < 12 ? 'Good morning' : now.getHours() < 17 ? 'Good afternoon' : 'Good evening';
   const dateStr = now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
 
-  // Extracted fetch into its own function so we can call it after the audit finishes
+  useEffect(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, []);
+
   const fetchStats = async () => {
     try {
       const res = await api.getDashboardStats();
@@ -38,15 +40,31 @@ const AdminDashboard = () => {
     fetchStats();
   }, []);
 
-  // ★ New function to trigger the audit and instantly refresh the UI
   const handleRunAudit = async () => {
     setIsAuditing(true);
     try {
-      await api.runAudit();
-      toast.success("Audit complete! Scores and Tiers updated.");
-      await fetchStats(); // Instantly pull the fresh data
+      const res = await api.runAudit();
+      const payload = res?.data || res;
+      const m = payload?.metrics || {}; 
+      
+      toast.success(
+        <div>
+          <p className="font-bold mb-1">Audit Complete!</p>
+          <ul className="text-xs space-y-0.5">
+            <li>• Expired Batches Deactivated: <b>{m.expiredBatchesDeactivated || 0}</b></li>
+            <li>• Near-Expiry Alerts: <b>{m.nearExpiryAlertsUpdated || 0}</b></li>
+            <li>• Inventory Desyncs Fixed: <b>{m.inventoryDesyncsFixed || 0}</b></li>
+            <li>• Ledger Desyncs Fixed: <b>{m.ledgerDesyncsFixed || 0}</b></li>
+            <li>• Client Profiles Updated: <b>{m.clientsProfiled || 0}</b></li>
+          </ul>
+        </div>, 
+        { duration: 5000 }
+      );
+      
+      await fetchStats(); 
     } catch (error) {
-      toast.error("Failed to run audit");
+      console.error("Audit Backend Error:", error.response || error);
+      toast.error(error.response?.data?.message || "Failed to run audit. Check console.");
     } finally {
       setIsAuditing(false);
     }
@@ -56,7 +74,6 @@ const AdminDashboard = () => {
 
   return (
     <div className="px-4 py-5 space-y-6 max-w-2xl mx-auto">
-      {/* Greeting & Audit Button Header */}
       <div className="pt-1 flex items-start justify-between">
         <div>
           <p className="text-slate-500 text-base">{dateStr}</p>
@@ -85,7 +102,9 @@ const AdminDashboard = () => {
       <FinancialSnapshot period={period} setPeriod={setPeriod} financials={data.financials} />
       <TopParties data={data.topParties} />
       <ConcernedParties parties={data.concernedParties} />
-      <TopProducts period={period} data={data.topProducts} />
+      
+      {/* ✨ THE FIX: We no longer pass period or data here. It handles itself! */}
+      <TopProducts />
 
       <div className="h-2" />
     </div>

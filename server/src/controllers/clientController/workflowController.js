@@ -2,45 +2,6 @@
 const Client = require('../../models/Client');
 const { notifyClient } = require('./clientHelpers');
 
-// exports.approveClient = async (req, res) => {
-//   try {
-//     const client = await Client.findById(req.params.id);
-//     if (!client) return res.status(404).json({ message: 'Client not found' });
-    
-//     client.status = 'Active';
-//     if (!client.accountApprovedAt) client.accountApprovedAt = new Date();
-
-//     if (client.documentRequests && client.documentRequests.length > 0) {
-//       client.documentRequests.forEach(req => {
-//         if (req.isActive) {
-//           req.isActive = false;
-//           req.status = 'completed';
-//           req.resolvedAt = new Date();
-//           req.resolutionReason = 'client_approved';
-//           req.resolvedBy = req.admin?._id; 
-//         }
-//       });
-//     }
-    
-//     await client.save();
-
-//     await notifyClient(client._id, {
-//       type: 'registration',
-//       title: 'Account approved',
-//       message: 'Your account has been approved. You can now place orders.',
-//       link: '/client-dashboard',
-//     });
-
-//     res.json({ success: true, message: 'Client approved successfully.' });
-//   } catch (err) {
-//     console.error("Approval Error:", err);
-//     res.status(500).json({ error: err.message || 'Failed to approve client' }); 
-//   }
-// };
-
-
-// server/src/controllers/clientController/workflowController.js
-
 exports.approveClient = async (req, res) => {
   try {
     const client = await Client.findById(req.params.id);

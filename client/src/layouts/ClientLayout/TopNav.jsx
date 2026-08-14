@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Pill, MessageSquare, Bell, ShoppingCart, CheckCircle2, Clock } from 'lucide-react';
+import { Pill, Bell, ShoppingCart, CheckCircle2, Clock } from 'lucide-react'; 
 import { HamburgerButton } from './components/HamburgerButton';
 import { NotificationsDropdown } from './NotificationsDropdown';
-import { api } from '../../services/api'; // ✨ Imported real API
+import { api } from '../../services/api'; 
 
 export const TopNav = ({ menuOpen, setMenuOpen, notifOpen, setNotifOpen, user }) => {
   const [notifications, setNotifications] = useState([]);
@@ -25,14 +25,12 @@ export const TopNav = ({ menuOpen, setMenuOpen, notifOpen, setNotifOpen, user })
     fetchNotifications();
   }, [fetchNotifications]);
 
-  // ✨ Calculate real unread count
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   const isApproved = user?.status === 'Active';
   const establishmentName = user?.establishmentName || 'Pharmacy';
 
   return (
-    // ✨ FIX: Removed conflicting sticky classes here since the parent div in ClientLayout handles it now
     <nav data-app-top-nav className="bg-white border-b border-slate-200">
       <div className="flex items-center justify-between px-4 h-16">
         <Link to="/client-dashboard" className="flex items-center gap-3 no-underline">
@@ -40,7 +38,7 @@ export const TopNav = ({ menuOpen, setMenuOpen, notifOpen, setNotifOpen, user })
             <Pill size={22} className="text-white" />
           </div>
           <p className="text-slate-900 font-extrabold text-xl tracking-tight m-0">
-            Vital<span className="text-emerald-600 font-medium">MEDS</span>
+            CoreVital<span className="text-emerald-600 font-medium">MEDS</span>
           </p>
         </Link>
 
@@ -50,13 +48,6 @@ export const TopNav = ({ menuOpen, setMenuOpen, notifOpen, setNotifOpen, user })
             className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-slate-50 rounded-xl transition-colors"
           >
             <ShoppingCart size={22} />
-          </Link>
-
-          <Link
-            to="/client-dashboard/support"
-            className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-slate-50 rounded-xl transition-colors"
-          >
-            <MessageSquare size={22} />
           </Link>
 
           {/* Notifications — dropdown modal */}

@@ -6,7 +6,8 @@ import {
   Clock, IndianRupee, FileText, Truck, Users,
   ArrowRight, Menu, X, Sparkles, BookOpen
 } from 'lucide-react';
-import { api } from '../../services/api'; // Adjust path if needed to your base api service
+import { api } from '../../services/api';
+import Navbar from '../../layouts/common/Navbar'
 
 /* ── STATS ── */
 const stats = [
@@ -77,10 +78,10 @@ const steps = [
 ];
 
 const tiers = [
-  { name: 'Silver', threshold: 'Up to ₹50K/mo', perks: ['Standard pricing', 'Net-30 credit', 'Email support'], color: 'border-slate-300 bg-slate-50', badge: 'bg-gray-100 text-gray-600' },
-  { name: 'Gold', threshold: '₹50K – ₹1L/mo', perks: ['5% better pricing', 'Net-45 credit', 'Priority support'], color: 'border-amber-300 bg-amber-50', badge: 'bg-amber-100 text-amber-700' },
-  { name: 'Platinum', threshold: '₹1L – ₹2L/mo', perks: ['8% better pricing', 'Net-60 credit', 'Dedicated manager'], color: 'border-slate-400 bg-slate-100', badge: 'bg-slate-200 text-slate-700' },
-  { name: 'Diamond', threshold: '₹2L+/mo', perks: ['Best rates + free goods', 'Flexible credit', 'Same-day dispatch'], color: 'border-cyan-300 bg-cyan-50', badge: 'bg-cyan-100 text-cyan-700', highlight: true },
+  { name: 'Silver', threshold: 'Up to ₹20K/mo', perks: ['Standard pricing', 'Net-30 credit', 'Email support'], color: 'border-slate-300 bg-slate-50', badge: 'bg-gray-100 text-gray-600' },
+  { name: 'Gold', threshold: '₹20K – ₹50K/mo', perks: ['5% better pricing', 'Net-45 credit', 'Priority support'], color: 'border-amber-300 bg-amber-50', badge: 'bg-amber-100 text-amber-700' },
+  { name: 'Platinum', threshold: '₹50K – ₹1L/mo', perks: ['8% better pricing', 'Net-60 credit', 'Dedicated manager'], color: 'border-slate-400 bg-slate-100', badge: 'bg-slate-200 text-slate-700' },
+  { name: 'Diamond', threshold: '₹1L+/mo', perks: ['Best rates + free goods', 'Flexible credit', 'Same-day dispatch'], color: 'border-cyan-300 bg-cyan-50', badge: 'bg-cyan-100 text-cyan-700', highlight: true },
 ];
 
 const LandingPage = () => {
@@ -88,50 +89,55 @@ const LandingPage = () => {
   const [companies, setCompanies] = useState([]);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
   const [showHowItWorksModal, setShowHowItWorksModal] = useState(false);
+  
+  // ✨ FIX: Expanded state to hold all dynamic distributor details
+  const [distributor, setDistributor] = useState({ 
+    name: 'Loading...', 
+    state: '...', 
+    phone: '—', 
+    email: '—' 
+  });
 
-  // Fetch registered companies dynamically from DB schema
   useEffect(() => {
-    const fetchCompanies = async () => {
+    const fetchLandingData = async () => {
+      // 1. Fetch Companies
       try {
-        const res = await api.getPublicCompanies(); // ✨ Call the new public API
+        const res = await api.getPublicCompanies();
         const companyList = res?.data || res || [];
         setCompanies(companyList.map(c => c.companyName || c.name || c));
       } catch (err) {
         console.error('Failed to fetch companies dynamically, using fallback', err);
-        setCompanies(['Cipla', 'Sun Pharma', "Dr. Reddy's", 'Mankind', 'Torrent', 'USV', 'Alkem', 'Aster', 'Sanofi', 'Macleods']);
       } finally {
         setLoadingCompanies(false);
       }
+
+      // 2. Fetch Public Distributor Contact Info (Unauthenticated)
+      try {
+        const res = await api.getPublicContactInfo();
+        const contactData = res?.data || res;
+        
+        if (contactData) {
+          // ✨ FIX: Load the dynamic name and state from the backend
+          setDistributor({
+            name: contactData.establishmentName || 'Our Distributor',
+            state: contactData.state || 'your region',
+            phone: contactData.phone || '—',
+            email: contactData.email || '—',
+          });
+        }
+      } catch (err) {
+        console.error('Failed to fetch distributor info for landing page', err);
+        setDistributor({ name: 'Our Distributor', state: 'your region', phone: '—', email: '—' });
+      }
     };
-    fetchCompanies();
+
+    fetchLandingData();
   }, []);
 
   return (
     <div className="min-h-screen bg-white overflow-x-hidden">
 
-      {/* ── NAVBAR ── */}
-      <nav className="sticky top-0 z-50 bg-slate-900/95 backdrop-blur border-b border-slate-700/50">
-        <div className="flex items-center justify-between px-4 py-3 max-w-2xl mx-auto">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/30">
-              <Pill size={16} className="text-white" />
-            </div>
-            <div>
-              <p className="text-white font-bold text-base leading-none tracking-tight">CoreVital<span className="text-emerald-400 ml-1.5">MEDS</span></p>
-              <p className="text-emerald-400 text-[9px] font-semibold tracking-widest uppercase">by Mila Agencies</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Link to="/login" className="text-slate-300 text-sm font-medium px-3 py-1.5 rounded-lg hover:text-white transition-colors">
-              Sign in
-            </Link>
-            <Link to="/register" className="bg-emerald-500 text-white text-sm font-bold px-4 py-2 rounded-xl shadow-lg shadow-emerald-500/25 hover:bg-emerald-400 transition-colors">
-              Register
-            </Link>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       {/* ── HERO ── */}
       <section className="bg-slate-900 px-4 pt-12 pb-16 relative overflow-hidden">
@@ -151,7 +157,7 @@ const LandingPage = () => {
         <div className="relative max-w-2xl mx-auto">
           <div className="inline-flex items-center gap-2 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold px-3 py-1.5 rounded-full mb-6">
             <Sparkles size={12} />
-            Odisha's Trusted Pharma Distributor
+            Trusted Pharma Distributor
           </div>
 
           <h1 className="text-white text-4xl font-black leading-tight tracking-tight mb-4">
@@ -160,7 +166,8 @@ const LandingPage = () => {
           </h1>
 
           <p className="text-slate-400 text-base leading-relaxed mb-8 max-w-sm">
-            CoreVital MEDS connects pharmacies in Odisha directly with Mila Agencies, with real-time stock, custom pricing, and GST-compliant invoicing.
+            {/* ✨ FIX: Dynamic State and Business Name */}
+            CoreVital MEDS connects pharmacies in {distributor.state} directly with {distributor.name}, with real-time stock, custom pricing, and GST-compliant invoicing.
           </p>
 
           <div className="flex flex-col gap-3 sm:flex-row">
@@ -191,8 +198,8 @@ const LandingPage = () => {
             </div>
           </div>
 
-          <p className="text-slate-500 text-xs mt-5 flex items-center gap-2">
-            <ShieldCheck size={13} className="text-emerald-500" />
+          <p className="text-slate-500 text-sm mt-5 flex items-center gap-2">
+            <ShieldCheck size={14} className="text-emerald-500" />
             KYC verified · GST compliant · Drug License required
           </p>
         </div>
@@ -204,7 +211,7 @@ const LandingPage = () => {
           {stats.map(({ value, label }) => (
             <div key={label} className="text-center">
               <p className="text-white font-black text-xl leading-none">{value}</p>
-              <p className="text-emerald-100 text-[9px] font-semibold mt-1 leading-tight">{label}</p>
+              <p className="text-emerald-100 text-xs font-semibold mt-1 leading-tight">{label}</p>
             </div>
           ))}
         </div>
@@ -245,7 +252,7 @@ const LandingPage = () => {
               </div>
               <div>
                 <h3 className="text-slate-900 font-bold text-sm">{title}</h3>
-                <p className="text-slate-500 text-xs mt-1 leading-relaxed">{desc}</p>
+                <p className="text-slate-500 text-sm mt-1 leading-relaxed">{desc}</p>
               </div>
             </div>
           ))}
@@ -265,20 +272,20 @@ const LandingPage = () => {
             <p className="text-slate-400 text-sm mt-2">Order more, unlock better rates and perks automatically.</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {tiers.map(({ name, threshold, perks, color, badge, highlight }) => (
               <div key={name}
-                className={`rounded-2xl border-2 p-4 ${color} ${highlight ? 'col-span-2 ring-2 ring-cyan-400/50' : ''}`}>
+                className={`rounded-2xl border-2 p-4 ${color} ${highlight ? 'ring-2 ring-cyan-400/50' : ''}`}>
                 <div className="flex items-center justify-between mb-3">
                   <span className={`text-xs font-black px-2 py-0.5 rounded-lg ${badge}`}>{name}</span>
-                  {highlight && <span className="text-[10px] font-black text-cyan-600 bg-cyan-100 px-2 py-0.5 rounded-full">BEST TIER</span>}
+                  {highlight && <span className="text-xs font-black text-cyan-600 bg-cyan-100 px-2 py-0.5 rounded-full">BEST TIER</span>}
                 </div>
-                <p className="text-slate-600 text-xs font-semibold mb-2">{threshold}</p>
+                <p className="text-slate-600 text-sm font-semibold mb-2">{threshold}</p>
                 <div className="space-y-1">
                   {perks.map(p => (
                     <div key={p} className="flex items-center gap-1.5">
-                      <CheckCircle size={11} className="text-emerald-600 shrink-0" />
-                      <span className="text-slate-700 text-xs">{p}</span>
+                      <CheckCircle size={14} className="text-emerald-600 shrink-0" />
+                      <span className="text-slate-700 text-sm">{p}</span>
                     </div>
                   ))}
                 </div>
@@ -315,9 +322,10 @@ const LandingPage = () => {
               Register Now — It's Free
               <ArrowRight size={18} />
             </Link>
-            <a href="tel:+919876543210"
-              className="flex items-center justify-center gap-2 bg-emerald-600/40 text-white font-semibold py-3 rounded-2xl text-sm border border-white/20">
-              <Phone size={15} /> Call Us: +91 98765 43210
+            {/* ✨ FIX: Used distributor state for phone mapping */}
+            <a href={`tel:${distributor.phone !== '—' ? distributor.phone : '+919876543210'}`}
+              className="flex items-center justify-center gap-2 bg-emerald-600/40 text-white font-semibold py-3 rounded-2xl text-sm border border-white/20 hover:bg-emerald-600/60 transition-colors">
+              <Phone size={15} /> Call Us: {distributor.phone}
             </a>
           </div>
         </div>
@@ -332,7 +340,8 @@ const LandingPage = () => {
             </div>
             <div>
               <p className="text-white font-bold text-sm leading-none">CoreVital MEDS</p>
-              <p className="text-slate-500 text-[10px]">by Mila Agencies, Odisha</p>
+              {/* ✨ FIX: Dynamic Business Name and State */}
+              <p className="text-slate-500 text-xs mt-0.5">by {distributor.name}, {distributor.state}</p>
             </div>
           </div>
 
@@ -346,11 +355,12 @@ const LandingPage = () => {
             <div>
               <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2.5">Contact</p>
               <div className="space-y-2">
+                {/* ✨ FIX: Used distributor state for contact info */}
                 <div className="flex items-center gap-2 text-slate-500 text-sm">
-                  <Phone size={13} /> +91 98765 43210
+                  <Phone size={13} /> {distributor.phone}
                 </div>
                 <div className="flex items-center gap-2 text-slate-500 text-sm">
-                  <Mail size={13} /> info@milaagencies.in
+                  <Mail size={13} /> {distributor.email}
                 </div>
                 <div className="flex items-center gap-2 text-slate-500 text-sm">
                   <Clock size={13} /> 8AM – 9PM, Mon–Sat
@@ -360,8 +370,8 @@ const LandingPage = () => {
           </div>
 
           <div className="border-t border-slate-700/50 pt-4 flex flex-col gap-1">
-            <p className="text-slate-600 text-xs">© 2026 Mila Agencies. All rights reserved.</p>
-            <p className="text-slate-700 text-xs">Drug License No. XX-XXXX-XXX | GSTIN: 21XXXXX</p>
+            {/* ✨ FIX: Dynamic Year and Name */}
+            <p className="text-slate-600 text-xs">© {new Date().getFullYear()} {distributor.name}. All rights reserved.</p>
           </div>
         </div>
       </footer>

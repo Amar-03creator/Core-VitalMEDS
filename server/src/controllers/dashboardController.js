@@ -25,12 +25,10 @@ exports.getDashboardStats = async (req, res) => {
     const nearExpiryCount = await Batch.countDocuments({ nearExpiry: true, totalStockQuantity: { $gt: 0 } });
     const lowStockCount = await Batch.countDocuments({ totalStockQuantity: { $lte: 10, $gt: 0 } });
 
-    // ✨ FIX: Count active orders awaiting invoicing
     const pendingOrdersCount = await Order.countDocuments({
       status: { $in: ['Placed', 'Editing', 'Confirmed', 'Invoiced', 'Packed', 'Shipped'] }
     });
 
-    // ✨ FIX: Count active inquiries awaiting quotes or conversion
     const openInquiriesCount = await Inquiry.countDocuments({
       status: { $in: ['Pending', 'Viewed', 'Quoted'] }
     });
@@ -55,14 +53,12 @@ exports.getDashboardStats = async (req, res) => {
       getFinancials(startOfLastYear, endOfLastYear)
     ]);
 
-    // Outstanding snapshot is current time, not historical
     const [outstandingStats] = await Client.aggregate([
       { $group: { _id: null, total: { $sum: '$totalOutstanding' }, count: { $sum: { $cond: [{ $gt: ['$totalOutstanding', 0] }, 1, 0] } } } }
     ]);
     const outstandingTotal = outstandingStats?.total || 0;
     const outstandingCount = outstandingStats?.count || 0;
 
-    // Helper for percentage change
     const calcGrowth = (current, previous) => previous === 0 ? 100 : Math.round(((current - previous) / previous) * 100);
     const calcRecovery = (collected, sold) => sold === 0 ? 0 : Math.round((collected / sold) * 100);
 
@@ -79,31 +75,7 @@ exports.getDashboardStats = async (req, res) => {
       }
     };
 
-    // --- 3. TOP PRODUCTS (This Month & This Year) ---
-    const getTopProducts = async (start, end) => {
-      return SalesInvoice.aggregate([
-        { $match: { invoiceDate: { $gte: start, $lte: end }, invoiceStatus: { $ne: 'CANCELLED' } } },
-        { $unwind: '$items' },
-        {
-          $group: {
-            _id: '$items.productId',
-            name: { $first: '$items.productName' },
-            company: { $first: '$items.companyShortCode' },
-            sold: { $sum: '$items.billedQty' },
-            revenue: { $sum: '$items.lineTotal' }
-          }
-        },
-        { $sort: { revenue: -1 } },
-        { $limit: 5 }
-      ]);
-    };
-    const [topProductsMonth, topProductsYear] = await Promise.all([
-      getTopProducts(startOfMonth, endOfMonth),
-      getTopProducts(startOfYear, endOfYear)
-    ]);
-
     // --- 4. TOP PARTIES ---
-    // Calculate exactly 3 months back from the start of the current month (e.g., if July, starts May 1st)
     const startOf3Months = new Date(now.getFullYear(), now.getMonth() - 2, 1);
 
     const topPartiesVolume = await SalesInvoice.aggregate([
@@ -116,13 +88,11 @@ exports.getDashboardStats = async (req, res) => {
       { $project: { name: 1, value: 1, tier: { $ifNull: ['$clientInfo.partyTier', 'Silver'] }, score: { $ifNull: ['$clientInfo.creditScore', 50] } } }
     ]);
 
-    // ✨ NEW: Get a list of Client IDs who have actually placed an order/invoice in the last 3 months
     const activeClientIds = await SalesInvoice.distinct('clientObjectId', {
       invoiceDate: { $gte: startOf3Months, $lte: endOfMonth },
       invoiceStatus: { $ne: 'CANCELLED' }
     });
 
-    // ✨ UPDATE: Filter MVP and Speed strictly by clients who are in the activeClientIds array
     const topPartiesSpeed = await Client.find({
       _id: { $in: activeClientIds },
       averagePaymentTime: { $gt: 0 }
@@ -138,14 +108,14 @@ exports.getDashboardStats = async (req, res) => {
     const concernedParties = concernedPartiesRaw.map(c => {
       const days = c.outstandingDate ? Math.floor((now - c.outstandingDate) / (1000 * 60 * 60 * 24)) : 0;
       return { name: c.establishmentName, outstanding: c.totalOutstanding, days, tier: c.partyTier || 'Silver', score: c.creditScore || 50 };
-    }).sort((a, b) => b.days - a.days).slice(0, 5); // Top 5 oldest debts
+    }).sort((a, b) => b.days - a.days).slice(0, 5); 
 
     res.status(200).json({
       success: true,
       data: {
         kpis: { pendingOrders: pendingOrdersCount, openInquiries: openInquiriesCount, lowStock: lowStockCount, nearExpiry: nearExpiryCount },
         financials,
-        topProducts: { month: topProductsMonth, year: topProductsYear },
+        // ✨ FIX: topProducts removed entirely from this payload!
         topParties: {
           volume: topPartiesVolume.map(p => ({ name: p.name, tier: p.tier, value: `₹${p.value.toLocaleString('en-IN')}`, score: p.score, meta: 'last 3 months' })),
           speed: topPartiesSpeed.map(p => ({ name: p.establishmentName, tier: p.partyTier, value: `${p.averagePaymentTime} days`, score: p.creditScore || 50, meta: 'avg pay time' })),
@@ -157,6 +127,50 @@ exports.getDashboardStats = async (req, res) => {
 
   } catch (error) {
     console.error('getDashboardStats error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ✨ NEW: Dynamic Top Products Fetcher for the Dashboard Component
+exports.getTopProductsByRange = async (req, res) => {
+  try {
+    const { year, fromMonth, toMonth } = req.query;
+
+    if (!year || !fromMonth || !toMonth) {
+      return res.status(400).json({ message: "Year, fromMonth, and toMonth are required." });
+    }
+
+    // Convert to integers. 
+    // Note: The frontend sends 1-indexed months (1 = Jan, 12 = Dec), but JS Dates use 0-indexed months.
+    const y = parseInt(year);
+    const mFrom = parseInt(fromMonth) - 1; 
+    const mTo = parseInt(toMonth); // We use mTo exactly to get the '0th' day of the NEXT month
+
+    // Start of the 'from' month (e.g., Jan 1st 00:00:00)
+    const startDate = new Date(y, mFrom, 1);
+    
+    // End of the 'to' month (e.g., Mar 31st 23:59:59)
+    const endDate = new Date(y, mTo, 0, 23, 59, 59, 999);
+
+    const topProducts = await SalesInvoice.aggregate([
+      { $match: { invoiceDate: { $gte: startDate, $lte: endDate }, invoiceStatus: { $ne: 'CANCELLED' } } },
+      { $unwind: '$items' },
+      {
+        $group: {
+          _id: '$items.productId',
+          name: { $first: '$items.productName' },
+          company: { $first: '$items.companyShortCode' },
+          sold: { $sum: '$items.billedQty' },
+          revenue: { $sum: '$items.lineTotal' }
+        }
+      },
+      { $sort: { revenue: -1 } },
+      { $limit: 5 } // Fetch top 5
+    ]);
+
+    res.status(200).json({ success: true, data: topProducts });
+  } catch (error) {
+    console.error('getTopProductsByRange error:', error);
     res.status(500).json({ message: error.message });
   }
 };

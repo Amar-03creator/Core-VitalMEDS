@@ -30,28 +30,29 @@ const NotificationCard = ({ notif, onMarkRead }) => {
   };
 
   return (
-    <div className={`bg-white rounded-2xl border overflow-hidden transition-all cursor-pointer hover:bg-slate-50
-      ${!notif.isRead ? 'border-slate-300 shadow-sm' : 'border-slate-200'}`} onClick={handleClick}>
-      <div className="px-4 py-3.5">
-        <div className="flex items-start gap-3">
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${cfg.bg}`}>
-            <Icon size={16} className={cfg.text} />
+    // ✨ FIX: Applied your requested styling (emerald unread state, larger icons, text-sm scaling)
+    <div className={`bg-white rounded-2xl border overflow-hidden transition-all cursor-pointer hover:border-slate-300
+      ${!notif.isRead ? 'border-emerald-200 shadow-sm shadow-emerald-500/5' : 'border-slate-200'}`} onClick={handleClick}>
+      <div className="px-4 py-4">
+        <div className="flex items-start gap-3.5">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${cfg.bg}`}>
+            <Icon size={18} className={cfg.text} />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <p className="text-slate-900 text-sm font-semibold">{notif.title}</p>
+                <p className="text-slate-900 text-base font-bold truncate">{notif.title}</p>
                 {!notif.isRead && <span className={`w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} />}
               </div>
-              <span className="text-slate-400 text-xs shrink-0">
-                {new Date(notif.createdAt).toLocaleDateString()}
+              <span className="text-slate-400 text-sm font-semibold shrink-0">
+                {new Date(notif.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
               </span>
             </div>
-            <p className="text-slate-600 text-xs mt-1 leading-relaxed">{notif.message}</p>
+            <p className="text-slate-600 text-sm mt-1 leading-relaxed">{notif.message}</p>
 
             {notif.link && (
-              <div className={`mt-2 flex items-center gap-1 text-[11px] font-semibold ${cfg.text}`}>
-                View Details <ChevronRight size={11} />
+              <div className={`mt-2.5 flex items-center gap-1 text-[12px] font-bold ${cfg.text}`}>
+                View Details <ChevronRight size={12} strokeWidth={3} />
               </div>
             )}
           </div>
@@ -108,29 +109,37 @@ const NotificationsPage = () => {
 
   return (
     <div className="px-4 py-4 space-y-4 max-w-2xl mx-auto">
+      
+      {/* ✨ FIX: Header section updated with Superscript logic! */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div>
-            <h1 className="text-slate-900 text-lg font-bold">Notifications</h1>
-            <p className="text-slate-500 text-xs">System alerts & business events</p>
-          </div>
-          {unreadCount > 0 && (
-            <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{unreadCount}</span>
-          )}
+        <div>
+          <h1 className="text-slate-900 text-3xl font-black tracking-tight flex items-start">
+            Notifications
+            {unreadCount > 0 && (
+              <span className="bg-red-500 text-white text-sm font-black px-2 py-0.5 rounded-full ml-1.5 -mt-1.5 shadow-sm leading-none">
+                {unreadCount}
+              </span>
+            )}
+          </h1>
+          <p className="text-slate-500 text-base font-medium mt-0.5">System alerts & business events</p>
         </div>
+
         {unreadCount > 0 && (
-          <button onClick={handleMarkAllRead} className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl">
-            <CheckCircle2 size={13} /> Mark all read
+          <button 
+            onClick={handleMarkAllRead} 
+            className="flex items-center gap-1.5 text-sm font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-xl hover:bg-emerald-100 transition-colors active:scale-95 shrink-0"
+          >
+            <CheckCircle2 size={14} /> Mark all read
           </button>
         )}
       </div>
 
       <div className="flex gap-2 overflow-x-auto scrollbar-none">
         {filterTabs.map(f => (
-          <button key={f} onClick={() => setActiveFilter(f)} className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${activeFilter === f ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200'}`}>
+          <button key={f} onClick={() => setActiveFilter(f)} className={`shrink-0 px-3 py-1.5 rounded-full text-base font-semibold border transition-all ${activeFilter === f ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200'}`}>
             {f}
             {f === 'Unread' && unreadCount > 0 && (
-              <span className="ml-1.5 bg-red-500 text-white text-[9px] font-bold px-1 py-0.5 rounded-full">{unreadCount}</span>
+              <span className="ml-1.5 bg-red-500 text-white text-base font-bold px-1 py-0.5 rounded-full">{unreadCount}</span>
             )}
           </button>
         ))}

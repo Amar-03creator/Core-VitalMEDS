@@ -21,7 +21,9 @@ const {
   // ✨ Added embedded document request controllers ✨
   createDocumentRequest,
   getActiveDocumentRequests,
-  resolveDocumentRequest
+  resolveDocumentRequest,
+  getDistributorProfile,
+  getPublicContactInfo
 } = require('../controllers/clientController');
 
 const {
@@ -38,8 +40,10 @@ const {
 router.get('/', authenticate, authorize('admin'), getAllClients);
 router.post('/', authenticate, authorize('admin'), createClient);
 
-// ✨ Duplicate Checker (MUST be above /:id routes so 'duplicates' isn't treated as an ID)
+
 router.get('/duplicates/check', checkDuplicate);
+router.get('/distributor-profile', authenticate, authorize('client'), getDistributorProfile);
+router.get('/public-contact', getPublicContactInfo);
 
 // ── Client self-service ("me") ──────────────────────────────────────────
 // MUST be above /:id so Express doesn't treat "me" as an ObjectId.

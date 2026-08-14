@@ -27,7 +27,8 @@ import ClientQuickReorderPage from './pages/Client/ClientQuickReorderPage';
 import ClientCart from './pages/Client/ClientCart';
 import ClientProfilePage from './pages/Client/ClientProfilePage';
 import ClientOffersPage from './pages/Client/ClientOffersPage';
-import HowOrderingWorks from './pages/Client/HowOrderingWorks'; // ✨ ADDED
+import HowOrderingWorks from './pages/Client/HowOrderingWorks'; 
+import AboutUsAdminPage from './pages/Client/AboutUsAdminPage'; // ✨ ADDED IMPORT
 
 // Admin
 import AdminLayout from './layouts/AdminLayout/AdminLayout';
@@ -78,7 +79,8 @@ function App() {
                     <Route path="cart" element={<ClientCart />} />
                     <Route path="profile" element={<ClientProfilePage />} />
                     <Route path="offers" element={<ClientOffersPage />} />
-                    <Route path="how-it-works" element={<HowOrderingWorks />} /> {/* ✨ ADDED */}
+                    <Route path="how-it-works" element={<HowOrderingWorks />} /> 
+                    <Route path="about" element={<AboutUsAdminPage />} /> {/* ✨ ADDED ROUTE */}
                   </Route>
                 </Route>
               </Route>

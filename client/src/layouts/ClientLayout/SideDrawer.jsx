@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { UserCircle2, FileText, BookOpen, MessageSquare, LogOut, ChevronRight, TrendingUp, Sparkles } from 'lucide-react';
+// ✨ Swapped MessageSquare for Building2
+import { UserCircle2, FileText, BookOpen, Building2, LogOut, ChevronRight, TrendingUp, Sparkles } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useBackHandler } from '../../hooks/useBackHandler';
 
@@ -11,8 +12,6 @@ const tierColors = {
   Silver: 'bg-slate-100 text-slate-500',
 };
 
-// Intentionally excludes Home / Products / Order Now / Reorder / My Orders —
-// those already live on the bottom nav.
 const navGroups = [
   {
     group: 'Promotions',
@@ -27,11 +26,12 @@ const navGroups = [
       { to: '/client-dashboard/billing', label: 'Billing Hub', icon: FileText },
     ],
   },
+  // ✨ REPLACED "Help" with "Information" & swapped Support for Distributor Profile
   {
-    group: 'Help',
+    group: 'Information',
     items: [
       { to: '/client-dashboard/how-it-works', label: 'How Ordering Works', icon: BookOpen },
-      { to: '/client-dashboard/support', label: 'Help & Support', icon: MessageSquare },
+      { to: '/client-dashboard/about', label: 'Distributor Profile', icon: Building2 }, 
     ],
   },
 ];

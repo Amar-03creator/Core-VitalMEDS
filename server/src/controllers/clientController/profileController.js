@@ -1,5 +1,6 @@
 // server/src/controllers/clientController/profileController.js
 const Client = require('../../models/Client');
+const Admin = require('../../models/Admin');
 const { getNextClientCode } = require('../../helpers/SequenceHelper');
 const {
   isValidGSTIN, isValidPAN, isValidAadhaar, isValidDL,
@@ -73,7 +74,7 @@ exports.getClientById = async (req, res) => {
   try {
     const client = await Client.findById(req.params.id).select('-__v');
     if (!client) return res.status(404).json({ message: 'Client not found' });
-    
+
     // Convert to a plain JS object so we can modify the URLs
     const clientObj = client.toObject();
 
@@ -270,5 +271,55 @@ exports.checkDuplicate = async (req, res) => {
     res.status(200).json({ exists: owners.length > 0, owners });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getDistributorProfile = async (req, res) => {
+  try {
+    const admin = await Admin.findOne({ 'proprietor.name': { $exists: true } })
+      // ✨ FIX: Explicitly fetching the emails and phones arrays for both roles
+      .select('establishmentName address email phone gstinAdmin drugsBazaarId drugLicenses proprietor.name proprietor.emails proprietor.phones competentPerson.name competentPerson.emails competentPerson.phones isProprietorAlsoCP')
+      .lean();
+
+    if (!admin) return res.status(404).json({ message: 'Distributor profile not found.' });
+
+    res.json({ success: true, data: admin });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ✨ NEW: Ultra-secure public route for the Landing Page (Proprietor Only)
+exports.getPublicContactInfo = async (req, res) => {
+  try {
+    const admin = await Admin.findOne({ 'proprietor.name': { $exists: true } })
+      // ✨ FIX: Added establishmentName and address.state to the select query
+      .select('establishmentName address.state email phone proprietor.emails proprietor.phones')
+      .lean();
+      
+    if (!admin) return res.status(404).json({ message: 'Distributor not found.' });
+
+    const emails = Array.from(new Set([
+      ...(admin.proprietor?.emails || []),
+      admin.email
+    ].filter(Boolean)));
+
+    const phones = Array.from(new Set([
+      ...(admin.proprietor?.phones || []),
+      admin.phone
+    ].filter(Boolean)));
+
+    res.json({ 
+      success: true, 
+      data: {
+        // ✨ FIX: Sending the dynamic business name and state
+        establishmentName: admin.establishmentName || 'The Distributor',
+        state: admin.address?.state || 'your region',
+        phone: phones.length > 0 ? phones[0] : '—',
+        email: emails.length > 0 ? emails[0] : '—'
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 };
