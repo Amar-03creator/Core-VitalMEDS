@@ -1,75 +1,60 @@
-import { useState } from 'react';
-import { Edit2, Save, X as XIcon, Plus, FileText } from 'lucide-react';
+import { useState, useRef } from 'react';
 import { toast } from 'sonner';
+import imageCompression from 'browser-image-compression';
+
 import { api } from '../../../../services/api';
 import { validateField } from '../../../../modals/AddCompanyModal/validation';
-import { RepCard } from '../components/Repcard';
-import { BankDetailCard } from '../components/Bankdetailcard';
-import { StatusToggle } from '../components/Statustoggle';
+import { getCroppedImg } from '../../../../modals/AddProductModal/cropImageHelper';
+
+// ✨ We import your flawlessly working AuthContext!
+import { useAuth } from '../../../../context/AuthContext'; 
+import { ProfileView } from '../components/ProfileView';
+import { ProfileEdit } from '../components/ProfileEdit';
 
 const emptyBank = { bankName: '', accountNumber: '', ifscCode: '', branch: '' };
 const emptyRep = { name: '', role: '', phone: '', email: '' };
 
-/**
- * ProfileTab
- * Per spec: explicit Edit/Save toggle (view mode -> edit mode), not an
- * always-editable form and not a separate modal.
- */
 export const ProfileTab = ({ company, onCompanyUpdated }) => {
+  // ✨ Extract the active user and the login function
+  const { user, login } = useAuth(); 
+
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
+  
   const [form, setForm] = useState(() => toFormState(company));
   const [errors, setErrors] = useState({});
+  const [vault, setVault] = useState({ isOpen: false, password: '' });
+
+  const fileInputRef = useRef(null);
+  const [logoFile, setLogoFile] = useState(null); 
+  const [logoPreview, setLogoPreview] = useState(company.logoUrl || null); 
+  const [cropper, setCropper] = useState({ imageSrc: null, crop: { x: 0, y: 0 }, zoom: 1, rotation: 0, pixels: null });
 
   function toFormState(c) {
     return {
-      companyName: c.companyName || '',
-      shortCode: c.shortCode || '',
-      gstin: c.gstin || '',
-      pan: c.pan || '',
-      drugLicenses: c.drugLicenses?.length ? c.drugLicenses : [''],
+      companyName: c.companyName || '', shortCode: c.shortCode || '', gstin: c.gstin || '',
+      pan: c.pan || '', drugLicenses: c.drugLicenses?.length ? c.drugLicenses : [''],
       drugLicenseExpiry: c.drugLicenseExpiry ? c.drugLicenseExpiry.split('T')[0] : '',
-      email: c.email || '',
-      whatsapp: c.whatsapp || '',
-      billingAddress: c.billingAddress || '',
-      city: c.city || '',
-      state: c.state || '',
-      pincode: c.pincode || '',
-      aadhaar: c.aadhaar || '',
-      drugsBazaarId: c.drugsBazaarId || '',
-      leadTimeDays: c.leadTimeDays ?? '',
+      email: c.email || '', whatsapp: c.whatsapp || '', billingAddress: c.billingAddress || '',
+      city: c.city || '', state: c.state || '', pincode: c.pincode || '', aadhaar: c.aadhaar || '', 
+      drugsBazaarId: c.drugsBazaarId || '', leadTimeDays: c.leadTimeDays ?? '',
       minimumOrderValue: c.minimumOrderValue ?? '',
       representatives: c.representatives?.length ? c.representatives : [{ ...emptyRep }],
       bankDetails: c.bankDetails || [],
     };
   }
 
-  const startEditing = () => {
-    setForm(toFormState(company));
-    setErrors({});
-    setEditing(true);
-  };
+  const startEditing = () => { setForm(toFormState(company)); setErrors({}); setLogoFile(null); setLogoPreview(company.logoUrl || null); setEditing(true); };
+  const cancelEditing = () => { if (logoFile && logoPreview) URL.revokeObjectURL(logoPreview); setLogoFile(null); setLogoPreview(company.logoUrl || null); setEditing(false); setErrors({}); };
 
-  const cancelEditing = () => {
-    setEditing(false);
-    setErrors({});
-  };
-
-  const handleField = (name, value) => {
-    setForm(prev => ({ ...prev, [name]: value }));
-    if (errors[name]) setErrors(prev => ({ ...prev, [name]: null }));
-  };
+  const handleField = (name, value) => { setForm(prev => ({ ...prev, [name]: value })); if (errors[name]) setErrors(prev => ({ ...prev, [name]: null })); };
 
   const handleBlurValidate = async (name, value) => {
     const err = validateField(name, value);
     setErrors(prev => ({ ...prev, [name]: err }));
     if (err || !value?.trim()) return;
 
-    // Live duplicate-check, excluding this company itself (per decision: reuse checkDuplicate).
-    // NOTE: this assumes api.checkDuplicate is extended to accept an excludeId param and the
-    // backend /duplicates/check route filters it out server-side (see PROFILE_TAB_BACKEND_NOTE.md
-    // for the exact change needed — I haven't seen that controller's current code).
     const strictFields = { gstin: 'GSTIN', pan: 'PAN', shortCode: 'Short Code', drugsBazaarId: 'DrugsBazaar ID' };
     if (strictFields[name]) {
       try {
@@ -77,342 +62,117 @@ export const ProfileTab = ({ company, onCompanyUpdated }) => {
         if (res.exists) {
           const names = res.owners.map(o => `${o.name} (${o.type})`).join(', ');
           const msg = `${strictFields[name]} is already registered with: ${names}`;
-          setErrors(prev => ({ ...prev, [name]: msg }));
-          toast.error(msg);
+          setErrors(prev => ({ ...prev, [name]: msg })); toast.error(msg);
         }
       } catch { /* silent */ }
     }
   };
 
-  /* ── Representatives ──────────────────────────────────────── */
-  const updateRep = (idx, field, value) => {
-    setForm(prev => {
-      const reps = [...prev.representatives];
-      reps[idx] = { ...reps[idx], [field]: value };
-      return { ...prev, representatives: reps };
-    });
+  const onLogoSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) return toast.error('Please select an image smaller than 10MB');
+    const reader = new FileReader();
+    reader.addEventListener('load', () => setCropper({ ...cropper, imageSrc: reader.result }));
+    reader.readAsDataURL(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
-  const setMainRep = (idx) => {
-    setForm(prev => {
-      const reps = [...prev.representatives];
-      const [chosen] = reps.splice(idx, 1);
-      reps.unshift(chosen);
-      return { ...prev, representatives: reps };
-    });
-  };
-  const addRep = () => setForm(prev => ({ ...prev, representatives: [...prev.representatives, { ...emptyRep }] }));
-  const removeRep = (idx) => setForm(prev => ({ ...prev, representatives: prev.representatives.filter((_, i) => i !== idx) }));
 
-  /* ── Bank details ─────────────────────────────────────────── */
-  const updateBank = (idx, field, value) => {
-    setForm(prev => {
-      const banks = [...prev.bankDetails];
-      banks[idx] = { ...banks[idx], [field]: field === 'ifscCode' ? value.toUpperCase().replace(/\s/g, '') : value };
-      return { ...prev, bankDetails: banks };
-    });
+  const handleCropSave = async () => {
+    if (!cropper.imageSrc || !cropper.pixels) return;
+    setSaving(true);
+    try {
+      const croppedBlob = await getCroppedImg(cropper.imageSrc, cropper.pixels, cropper.rotation);
+      const compressedFile = await imageCompression(croppedBlob, { maxSizeMB: 0.2, maxWidthOrHeight: 600, useWebWorker: true });
+      const newPreview = URL.createObjectURL(compressedFile);
+      if (logoFile && logoPreview) URL.revokeObjectURL(logoPreview); 
+      setLogoFile(compressedFile); setLogoPreview(newPreview);
+      setCropper({ imageSrc: null, crop: { x: 0, y: 0 }, zoom: 1, rotation: 0, pixels: null });
+    } catch (err) { toast.error('Failed to crop image'); } finally { setSaving(false); }
   };
-  const addBank = () => setForm(prev => ({ ...prev, bankDetails: [...prev.bankDetails, { ...emptyBank }] }));
-  const removeBank = (idx) => setForm(prev => ({ ...prev, bankDetails: prev.bankDetails.filter((_, i) => i !== idx) }));
 
-  /* ── Drug Licenses (simple multi-input list, no Add/Update gating here
-     since Profile tab is a single Save action, not a stepwise form) ── */
-  const updateLicense = (idx, value) => {
-    setForm(prev => {
-      const lics = [...prev.drugLicenses];
-      lics[idx] = value.toUpperCase().replace(/\s/g, '');
-      return { ...prev, drugLicenses: lics };
-    });
+  const initiateSave = () => {
+    if (!form.companyName.trim()) return toast.error('Company name is required.');
+    if (!form.representatives.some(r => r.name && (r.phone || r.email))) return toast.error('At least one representative with name and phone/email is required.');
+    if (Object.values(errors).some(Boolean)) return toast.error('Please fix the highlighted fields before saving.');
+    if (logoFile) setVault({ isOpen: true, password: '' }); else executeSave();
   };
-  const addLicenseField = () => setForm(prev => ({ ...prev, drugLicenses: [...prev.drugLicenses, ''] }));
-  const removeLicenseField = (idx) => setForm(prev => ({ ...prev, drugLicenses: prev.drugLicenses.filter((_, i) => i !== idx) }));
 
-  /* ── Save ─────────────────────────────────────────────────── */
-  const handleSave = async () => {
-    if (!form.companyName.trim()) {
-      toast.error('Company name is required.');
-      return;
+  // ✨ THE MAGIC TRICK: Verifying the password without changing backend or context!
+  const verifyVaultPassword = async () => {
+    setSaving(true);
+    try {
+      // 1. We silently pass the logged-in admin's email and the typed password
+      // back into your perfectly working AWS login function.
+      await login(user.email, vault.password); 
+      
+      // 2. If it succeeds, the password is correct!
+      setVault({ isOpen: false, password: '' });
+      await executeSave();
+    } catch (error) {
+      // 3. If it rejects, AWS caught a bad password!
+      toast.error('Incorrect password. Authorization failed.');
+      setSaving(false);
     }
-    if (!form.representatives.some(r => r.name && (r.phone || r.email))) {
-      toast.error('At least one representative with name and phone/email is required.');
-      return;
-    }
+  };
 
-    const hasBlockingError = Object.values(errors).some(Boolean);
-    if (hasBlockingError) {
-      toast.error('Please fix the highlighted fields before saving.');
-      return;
-    }
-
+  const executeSave = async () => {
     setSaving(true);
     try {
       const payload = {
-        companyName: form.companyName,
-        shortCode: form.shortCode,
+        companyName: form.companyName, shortCode: form.shortCode,
         representatives: form.representatives.filter(r => r.name),
-        gstin: form.gstin,
-        pan: form.pan,
+        gstin: form.gstin, pan: form.pan,
         drugLicenses: form.drugLicenses.filter(l => l.trim()),
         drugLicenseExpiry: form.drugLicenseExpiry || undefined,
-        email: form.email,
-        whatsapp: form.whatsapp,
-        billingAddress: form.billingAddress,
-        city: form.city,
-        state: form.state,
-        pincode: form.pincode,
-        aadhaar: form.aadhaar,
+        email: form.email, whatsapp: form.whatsapp, billingAddress: form.billingAddress,
+        city: form.city, state: form.state, pincode: form.pincode, aadhaar: form.aadhaar, 
         drugsBazaarId: form.drugsBazaarId,
         leadTimeDays: form.leadTimeDays ? parseInt(form.leadTimeDays) : undefined,
         minimumOrderValue: form.minimumOrderValue ? parseFloat(form.minimumOrderValue) : undefined,
         bankDetails: form.bankDetails.filter(b => b.bankName && b.accountNumber && b.ifscCode && b.branch),
       };
+
+      if (logoFile) {
+        const sigRes = await api.getUploadSignature(); 
+        const { signature, timestamp, cloudName, apiKey } = sigRes.data || sigRes;
+        const fd = new FormData();
+        fd.append('file', logoFile); fd.append('api_key', apiKey); fd.append('timestamp', timestamp);
+        fd.append('signature', signature); fd.append('folder', 'vitalmeds_products');
+        
+        const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, { method: 'POST', body: fd });
+        const cloudData = await uploadRes.json();
+        if (cloudData.secure_url) { payload.logoUrl = cloudData.secure_url; payload.logoPublicId = cloudData.public_id; }
+        else throw new Error('Image upload failed');
+      }
+
       const res = await api.updateCompany(company._id, payload);
       toast.success('Company profile updated.');
       onCompanyUpdated(res.data);
       setEditing(false);
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setSaving(false);
-    }
+    } catch (err) { toast.error(err.message || 'Failed to save'); } finally { setSaving(false); }
   };
 
-  const handleToggleStatus = async () => {
-    setStatusBusy(true);
-    try {
-      const res = await api.toggleCompanyStatus(company._id);
-      toast.success(res.message);
-      onCompanyUpdated(res.data);
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setStatusBusy(false);
-    }
-  };
-
-  /* ════════════════════════════ VIEW MODE ════════════════════════════ */
   if (!editing) {
-    return (
-      <div className="space-y-5">
-        <div className="flex items-center justify-between">
-          <StatusToggle status={company.status} onConfirm={handleToggleStatus} busy={statusBusy} entityLabel="supplier" />
-          <button
-            onClick={startEditing}
-            className="flex items-center gap-1.5 bg-slate-900 text-white text-sm font-semibold px-3.5 py-2 rounded-xl"
-          >
-            <Edit2 size={14} /> Edit Profile
-          </button>
-        </div>
-
-        <Section title="Legal & Tax">
-          <Field label="GSTIN" value={company.gstin} />
-          <Field label="PAN" value={company.pan} />
-          <Field label="Drug Licenses" value={company.drugLicenses?.join(', ')} />
-          <Field label="License Expiry" value={company.drugLicenseExpiry ? new Date(company.drugLicenseExpiry).toLocaleDateString('en-IN') : null} />
-          <Field label="Aadhaar" value={company.aadhaar} />
-          <Field label="DrugsBazaar ID" value={company.drugsBazaarId} />
-        </Section>
-
-        <Section title="Contact & Address">
-          <Field label="Email" value={company.email} />
-          <Field label="WhatsApp" value={company.whatsapp} />
-          <Field label="Billing Address" value={company.billingAddress} />
-          <Field label="City / State / Pincode" value={[company.city, company.state, company.pincode].filter(Boolean).join(' / ')} />
-        </Section>
-
-        <Section title="Procurement Settings">
-          <Field label="Lead Time" value={company.leadTimeDays ? `${company.leadTimeDays} days` : null} />
-          <Field label="Min. Order Value" value={company.minimumOrderValue ? `₹${company.minimumOrderValue.toLocaleString('en-IN')}` : null} />
-        </Section>
-
-        <div>
-          <h4 className="text-slate-700 font-semibold text-base mb-2">Representatives</h4>
-          <div className="space-y-2">
-            {company.representatives?.map((rep, i) => (
-              <RepCard key={i} rep={rep} isMain={i === 0} />
-            ))}
-          </div>
-        </div>
-
-        {company.bankDetails?.length > 0 && (
-          <div>
-            <h4 className="text-slate-700 font-semibold text-base mb-2">Bank Details</h4>
-            <div className="space-y-2">
-              {company.bankDetails.map((b, i) => <BankDetailCard key={i} bank={b} />)}
-            </div>
-          </div>
-        )}
-
-        <DocumentStub label="Drug License Certificate" />
-        <DocumentStub label="GST Certificate" />
-      </div>
-    );
+    return <ProfileView company={company} onStartEditing={startEditing} onToggleStatus={async () => { setStatusBusy(true); try { const res = await api.toggleCompanyStatus(company._id); toast.success(res.message); onCompanyUpdated(res.data); } catch (err) { toast.error(err.message); } finally { setStatusBusy(false); } }} statusBusy={statusBusy} />;
   }
 
-  /* ════════════════════════════ EDIT MODE ════════════════════════════ */
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-slate-900 font-bold text-lg">Editing Profile</h3>
-        <div className="flex gap-2">
-          <button onClick={cancelEditing} className="flex items-center gap-1 bg-slate-100 text-slate-600 text-sm font-semibold px-3 py-2 rounded-xl">
-            <XIcon size={14} /> Cancel
-          </button>
-          <button onClick={handleSave} disabled={saving} className="flex items-center gap-1 bg-emerald-500 text-white text-sm font-semibold px-3 py-2 rounded-xl disabled:opacity-60">
-            <Save size={14} /> {saving ? 'Saving…' : 'Save'}
-          </button>
-        </div>
-      </div>
-
-      <LabeledInput label="Company Name *" value={form.companyName} onChange={(v) => handleField('companyName', v)} />
-
-      <div className="grid grid-cols-2 gap-3">
-        <LabeledInput label="Short Code" value={form.shortCode} onChange={(v) => handleField('shortCode', v)} onBlur={() => handleBlurValidate('shortCode', form.shortCode)} error={errors.shortCode} />
-        <LabeledInput label="GSTIN" value={form.gstin} onChange={(v) => handleField('gstin', v.toUpperCase())} onBlur={() => handleBlurValidate('gstin', form.gstin)} error={errors.gstin} />
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <LabeledInput label="PAN" value={form.pan} onChange={(v) => handleField('pan', v.toUpperCase())} onBlur={() => handleBlurValidate('pan', form.pan)} error={errors.pan} />
-        <LabeledInput label="Aadhaar" value={form.aadhaar} onChange={(v) => handleField('aadhaar', v.replace(/\D/g, ''))} onBlur={() => handleBlurValidate('aadhaar', form.aadhaar)} error={errors.aadhaar} />
-      </div>
-
-      <div>
-        <label className="text-sm font-semibold text-slate-700 block mb-1">Drug Licenses</label>
-        <div className="space-y-2">
-          {form.drugLicenses.map((lic, i) => (
-            <div key={i} className="flex gap-2">
-              <input
-                value={lic}
-                onChange={(e) => updateLicense(i, e.target.value)}
-                className="flex-1 bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-base outline-none focus:border-emerald-400"
-              />
-              {form.drugLicenses.length > 1 && (
-                <button onClick={() => removeLicenseField(i)} className="px-3 text-red-500 font-semibold">✕</button>
-              )}
-            </div>
-          ))}
-        </div>
-        <button onClick={addLicenseField} className="text-emerald-600 text-sm font-semibold mt-1.5">+ Add license</button>
-      </div>
-
-      <LabeledInput type="date" label="Drug License Expiry" value={form.drugLicenseExpiry} onChange={(v) => handleField('drugLicenseExpiry', v)} />
-      <LabeledInput label="DrugsBazaar ID" value={form.drugsBazaarId} onChange={(v) => handleField('drugsBazaarId', v.toUpperCase())} onBlur={() => handleBlurValidate('drugsBazaarId', form.drugsBazaarId)} error={errors.drugsBazaarId} />
-
-      <div className="grid grid-cols-2 gap-3">
-        <LabeledInput label="Email" value={form.email} onChange={(v) => handleField('email', v.toLowerCase())} onBlur={() => handleBlurValidate('email', form.email)} error={errors.email} />
-        <LabeledInput label="WhatsApp" value={form.whatsapp} onChange={(v) => handleField('whatsapp', v.replace(/\D/g, '').slice(0, 10))} />
-      </div>
-
-      <LabeledInput label="Billing Address" value={form.billingAddress} onChange={(v) => handleField('billingAddress', v)} textarea />
-
-      <div className="grid grid-cols-3 gap-3">
-        <LabeledInput label="City" value={form.city} onChange={(v) => handleField('city', v)} />
-        <LabeledInput label="State" value={form.state} onChange={(v) => handleField('state', v)} />
-        <LabeledInput label="Pincode" value={form.pincode} onChange={(v) => handleField('pincode', v.replace(/\D/g, ''))} onBlur={() => handleBlurValidate('pincode', form.pincode)} error={errors.pincode} />
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <LabeledInput type="number" label="Lead Time (days)" value={form.leadTimeDays} onChange={(v) => handleField('leadTimeDays', v)} />
-        <LabeledInput type="number" label="Min. Order Value (₹)" value={form.minimumOrderValue} onChange={(v) => handleField('minimumOrderValue', v)} />
-      </div>
-
-      <div>
-        <h4 className="text-slate-700 font-semibold text-base mb-2">Representatives *</h4>
-        <div className="space-y-2">
-          {form.representatives.map((rep, i) => (
-            <RepCard
-              key={i}
-              rep={rep}
-              isMain={i === 0}
-              editable
-              onChange={(field, value) => updateRep(i, field, value)}
-              onSetMain={() => setMainRep(i)}
-              onRemove={form.representatives.length > 1 ? () => removeRep(i) : undefined}
-            />
-          ))}
-        </div>
-        <button onClick={addRep} className="text-emerald-600 text-sm font-semibold mt-2">+ Add Representative</button>
-      </div>
-
-      <div>
-        <h4 className="text-slate-700 font-semibold text-base mb-2">Bank Details</h4>
-        <div className="space-y-2">
-          {form.bankDetails.map((b, i) => (
-            <div key={i} className="border border-slate-300 rounded-xl p-3 space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm font-semibold text-slate-700">Bank #{i + 1}</span>
-                <button onClick={() => removeBank(i)} className="text-red-500 text-sm">Remove</button>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <input placeholder="Bank Name" value={b.bankName} onChange={(e) => updateBank(i, 'bankName', e.target.value)}
-                  className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-base outline-none focus:border-emerald-400" />
-                <input placeholder="Account Number" value={b.accountNumber} onChange={(e) => updateBank(i, 'accountNumber', e.target.value.replace(/\D/g, ''))}
-                  className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-base outline-none focus:border-emerald-400" />
-                <input placeholder="IFSC Code" value={b.ifscCode} onChange={(e) => updateBank(i, 'ifscCode', e.target.value)}
-                  className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-base outline-none focus:border-emerald-400" />
-                <input placeholder="Branch" value={b.branch} onChange={(e) => updateBank(i, 'branch', e.target.value)}
-                  className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-base outline-none focus:border-emerald-400" />
-              </div>
-            </div>
-          ))}
-        </div>
-        <button onClick={addBank} className="text-emerald-600 text-sm font-semibold mt-2">+ Add Bank</button>
-      </div>
-
-      <DocumentStub label="Drug License Certificate" />
-      <DocumentStub label="GST Certificate" />
-    </div>
+    <ProfileEdit 
+      form={form} errors={errors} saving={saving} logoPreview={logoPreview} cropper={cropper}
+      vault={vault} setVault={setVault} verifyVaultPassword={verifyVaultPassword}
+      onCancel={cancelEditing} onInitiateSave={initiateSave} onFieldChange={handleField} onBlurValidate={handleBlurValidate}
+      onLogoSelect={onLogoSelect} setCropper={setCropper} handleCropSave={handleCropSave} fileInputRef={fileInputRef}
+      updateRep={(i, f, v) => setForm(p => { const r = [...p.representatives]; r[i] = { ...r[i], [f]: v }; return { ...p, representatives: r }; })}
+      setMainRep={(i) => setForm(p => { const r = [...p.representatives]; const [c] = r.splice(i, 1); r.unshift(c); return { ...p, representatives: r }; })}
+      addRep={() => setForm(p => ({ ...p, representatives: [...p.representatives, { ...emptyRep }] }))}
+      removeRep={(i) => setForm(p => ({ ...p, representatives: p.representatives.filter((_, idx) => idx !== i) }))}
+      updateBank={(i, f, v) => setForm(p => { const b = [...p.bankDetails]; b[i] = { ...b[i], [f]: f === 'ifscCode' ? v.toUpperCase().replace(/\s/g, '') : v }; return { ...p, bankDetails: b }; })}
+      addBank={() => setForm(p => ({ ...p, bankDetails: [...p.bankDetails, { ...emptyBank }] }))}
+      removeBank={(i) => setForm(p => ({ ...p, bankDetails: p.bankDetails.filter((_, idx) => idx !== i) }))}
+      updateLicense={(i, v) => setForm(p => { const l = [...p.drugLicenses]; l[i] = v.toUpperCase().replace(/\s/g, ''); return { ...p, drugLicenses: l }; })}
+      addLicenseField={() => setForm(p => ({ ...p, drugLicenses: [...p.drugLicenses, ''] }))}
+      removeLicenseField={(i) => setForm(p => ({ ...p, drugLicenses: p.drugLicenses.filter((_, idx) => idx !== i) }))}
+    />
   );
 };
-
-/* ── small local presentational helpers (kept private to this file
-   since they're trivial wrappers only used inside ProfileTab) ───────── */
-
-const Section = ({ title, children }) => (
-  <div>
-    <h4 className="text-slate-700 font-semibold text-base mb-2">{title}</h4>
-    <div className="bg-slate-50 rounded-xl border border-slate-200 divide-y divide-slate-200">
-      {children}
-    </div>
-  </div>
-);
-
-const Field = ({ label, value }) => (
-  <div className="flex justify-between px-3 py-2.5 text-base">
-    <span className="text-slate-500">{label}</span>
-    <span className="text-slate-800 font-medium text-right">{value || '—'}</span>
-  </div>
-);
-
-const LabeledInput = ({ label, value, onChange, onBlur, error, type = 'text', textarea = false }) => (
-  <div>
-    <label className="text-sm font-semibold text-slate-700 block mb-1">{label}</label>
-    {textarea ? (
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        rows={2}
-        className={`w-full bg-white border ${error ? 'border-red-500' : 'border-slate-300'} rounded-xl px-3 py-2.5 text-base outline-none focus:border-emerald-400 resize-none`}
-      />
-    ) : (
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={onBlur}
-        className={`w-full bg-white border ${error ? 'border-red-500' : 'border-slate-300'} rounded-xl px-3 py-2.5 text-base outline-none focus:border-emerald-400`}
-      />
-    )}
-    {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
-  </div>
-);
-
-const DocumentStub = ({ label }) => (
-  <div className="border border-dashed border-slate-300 rounded-xl px-3 py-3 flex items-center justify-between">
-    <span className="flex items-center gap-2 text-slate-500 text-base">
-      <FileText size={16} /> {label}
-    </span>
-    <button disabled className="flex items-center gap-1 text-slate-400 text-sm font-semibold cursor-not-allowed">
-      <Plus size={14} /> Upload (coming soon)
-    </button>
-  </div>
-);

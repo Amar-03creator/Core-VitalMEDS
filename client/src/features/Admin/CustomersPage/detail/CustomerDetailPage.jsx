@@ -1,12 +1,10 @@
-// client/src/features/Admin/CustomersPage/detail/CustomerDetailPage.jsx
 import { useState } from 'react';
-import { Edit, UserX, ShieldCheck } from 'lucide-react';   // keep imports for modals
+import { motion } from 'framer-motion';
 import { useCustomerDetail } from '../hooks/useCustomerDetail';
 import { SuspendOtpModal } from '../modals/SuspendOtpModal';
 import { EditCustomerModal } from '../modals/EditCustomerModal';
-import { TakeActionModal } from '../modals/TakeActionModal'; // ✨ RESTORED: The Document Request / Approval Modal
+import { TakeActionModal } from '../modals/TakeActionModal';
 import { CardContent } from '../components/CustomerCard';
-import { STATUS_CFG } from '../utils/constants';
 import { OverviewTab } from './tabs/OverviewTab';
 import { InvoicesTab } from './tabs/InvoicesTab';
 import { PaymentsTab } from './tabs/PaymentsTab';
@@ -27,9 +25,10 @@ const TABS = [
 export const CustomerDetailPage = ({
   clientId,
   customer,
+  initialCustomer,
   onListChange,
   onApprove,
-  onReject, // ✨ RESTORED: Needed for the TakeActionModal
+  onReject,
 }) => {
   const {
     client, loading, error,
@@ -40,17 +39,15 @@ export const CustomerDetailPage = ({
 
   const [suspendOpen, setSuspendOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const [takeActionOpen, setTakeActionOpen] = useState(false); // ✨ RESTORED
+  const [takeActionOpen, setTakeActionOpen] = useState(false);
 
   useBackHandler(
     activeTab !== 'overview',
     () => setActiveTab('overview'),
-    `tab_${clientId}` // Static ID so it survives F5 reloads!
+    `tab_${clientId}`
   );
 
-  const displayClient = client || customer;
-
-  // Check if the account is currently suspended
+  const displayClient = client || customer || initialCustomer;
   const isSuspended = displayClient?.status === 'Suspended';
   const [reactivating, setReactivating] = useState(false);
 
@@ -60,7 +57,7 @@ export const CustomerDetailPage = ({
     try {
       await api.reactivateClient(clientId);
       toast.success('Account successfully reactivated!');
-      if (onListChange) onListChange(); // Close drawer & refresh list
+      if (onListChange) onListChange();
     } catch (err) {
       toast.error(err.message || 'Failed to reactivate account');
       setReactivating(false);
@@ -68,14 +65,21 @@ export const CustomerDetailPage = ({
   };
 
   return (
-    <div className="h-full flex flex-col">
-
-      {/* ── Sticky header — card content only, no action buttons ── */}
-      <div className="shrink-0 bg-white">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="h-full flex flex-col bg-slate-50 fixed top-[67px] bottom-0 left-0 right-0 z-[60]"
+    >
+      {/* Sticky header morph target */}
+      <div className="shrink-0 bg-white shadow-sm z-20">
         {displayClient ? (
-          <div className="border-b border-slate-100">
+          <motion.div
+            layoutId={initialCustomer ? `customer-card-${displayClient._id}` : undefined}
+            className="border-b border-slate-100 bg-white"
+          >
             <CardContent customer={displayClient} />
-          </div>
+          </motion.div>
         ) : (
           <div className="p-4 animate-pulse">
             <div className="flex gap-3">
@@ -103,9 +107,9 @@ export const CustomerDetailPage = ({
         </div>
       </div>
 
-      {/* ── Scrollable content ── */}
+      {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto min-h-0 px-4 py-4 pb-24">
-        {loading && !client && (
+        {loading && !displayClient && (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 rounded-full border-2 border-slate-900 border-t-transparent animate-spin" />
           </div>
@@ -119,11 +123,11 @@ export const CustomerDetailPage = ({
         )}
 
         {client && (
-          <>
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
             {activeTab === 'overview' && (
               <OverviewTab
                 client={client}
-                onTakeAction={() => setTakeActionOpen(true)} 
+                onTakeAction={() => setTakeActionOpen(true)}
                 onApprove={client.status === 'Pending' ? () => onApprove(client) : undefined}
                 onEdit={!isSuspended ? () => setEditOpen(true) : undefined}
                 onSuspend={!isSuspended ? () => setSuspendOpen(true) : undefined}
@@ -148,7 +152,7 @@ export const CustomerDetailPage = ({
               />
             )}
             {activeTab === 'ledger' && <LedgerTab clientId={clientId} client={client} />}
-          </>
+          </motion.div>
         )}
       </div>
 
@@ -167,12 +171,11 @@ export const CustomerDetailPage = ({
           onClose={() => setSuspendOpen(false)}
           onConfirmSuccess={() => {
             setSuspendOpen(false);
-            if (onListChange) onListChange(); // Gracefully close and reload
+            if (onListChange) onListChange();
           }}
         />
       )}
 
-      {/* ✨ RESTORED: The Take Action Modal for pending accounts */}
       {takeActionOpen && displayClient && (
         <TakeActionModal
           client={displayClient}
@@ -187,6 +190,6 @@ export const CustomerDetailPage = ({
           }}
         />
       )}
-    </div>
+    </motion.div>
   );
 };

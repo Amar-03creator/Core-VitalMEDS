@@ -2,6 +2,8 @@ const Company = require('../models/Company');
 const Client = require('../models/Client');
 const PurchaseBill = require('../models/PurchaseBill');
 const DebitNote = require('../models/DebitNote');
+const Product = require('../models/Product');
+const cloudinary = require('cloudinary').v2;
 
 /* ── Format validators ─────────────────────────────────────── */
 const isValidGSTIN = (v) => /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(v);
@@ -250,6 +252,7 @@ exports.getCompanyById = async (req, res) => {
 /* ── updateCompany ───────────────────────────────────────── ★ NEW
    Same validation + uniqueness logic as createCompany, but every
    uniqueness check excludes this company's own _id.               */
+/* ── updateCompany ───────────────────────────────────────── */
 exports.updateCompany = async (req, res) => {
     try {
         const { id } = req.params;
@@ -265,6 +268,7 @@ exports.updateCompany = async (req, res) => {
             aadhaar, drugsBazaarId,
             leadTimeDays, minimumOrderValue,
             bankDetails,
+            logoUrl, logoPublicId // ✨ Extract new logo fields
         } = req.body;
 
         const errors = [];
@@ -343,9 +347,13 @@ exports.updateCompany = async (req, res) => {
             return res.status(409).json({ message: dupeMessages.join(' ') });
         }
 
+        // ✨ Store old values for sync & garbage collection checks
+        const oldName = existing.companyName;
+        const oldLogoPublicId = existing.logoPublicId;
+
         existing.companyName = companyName;
         existing.shortCode = shortCode;
-        if (status) existing.status = status; // status toggle has its own dedicated endpoint, but allow it here too
+        if (status) existing.status = status;
         existing.representatives = representatives.map(rep => ({ ...rep, phone: strip91(rep.phone) }));
         existing.gstin = gstin;
         existing.pan = pan;
@@ -363,8 +371,31 @@ exports.updateCompany = async (req, res) => {
         existing.leadTimeDays = leadTimeDays ? parseInt(leadTimeDays) : undefined;
         existing.minimumOrderValue = minimumOrderValue ? parseFloat(minimumOrderValue) : undefined;
         existing.bankDetails = (bankDetails || []).filter(b => b.bankName && b.accountNumber && b.ifscCode && b.branch);
+        
+        // ✨ Assign new logo if uploaded
+        if (logoUrl !== undefined) existing.logoUrl = logoUrl;
+        if (logoPublicId !== undefined) existing.logoPublicId = logoPublicId;
 
         await existing.save();
+
+        // ✨ FEATURE 1: Product Catalog Sync
+        if (oldName !== companyName) {
+            await Product.updateMany(
+                { companyId: id },
+                { $set: { company: companyName } }
+            );
+        }
+
+        // ✨ FEATURE 2: Cloudinary Garbage Collection
+        if (logoPublicId && oldLogoPublicId && oldLogoPublicId !== logoPublicId) {
+            try {
+                await cloudinary.uploader.destroy(oldLogoPublicId);
+                console.log(`[Garbage Collector] Wiped old company logo: ${oldLogoPublicId}`);
+            } catch (err) {
+                console.error('[Garbage Collector] Failed to wipe old logo:', err);
+            }
+        }
+
         res.status(200).json({ message: 'Company updated successfully!', data: existing });
     } catch (error) {
         console.error('updateCompany error:', error);

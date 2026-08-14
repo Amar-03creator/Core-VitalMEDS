@@ -1,9 +1,10 @@
 // client/src/pages/Admin/CustomersPage.jsx
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../../services/api'; // ✨ Relying purely on our secure, modular API
+import { motion, AnimatePresence } from 'framer-motion';
+import { api } from '../../services/api';
 import { useBackHandler } from '../../hooks/useBackHandler';
 import { useCustomers } from '../../features/Admin/CustomersPage/hooks/useCustomers';
 import { CustomerKPICards } from '../../features/Admin/CustomersPage/components/CustomerKPICards';
@@ -15,33 +16,6 @@ import { EditCustomerModal } from '../../features/Admin/CustomersPage/modals/Edi
 import { RejectModal } from '../../features/Admin/CustomersPage/modals/RejectModal';
 import { SuspendModal } from '../../features/Admin/CustomersPage/modals/SuspendModal';
 import { CustomerDetailPage } from '../../features/Admin/CustomersPage/detail/CustomerDetailPage';
-
-const TOP_NAV_FALLBACK = 67;
-const BOTTOM_NAV_FALLBACK = 80;
-
-const useNavHeights = () => {
-  const [heights, setHeights] = useState({ top: TOP_NAV_FALLBACK, bottom: BOTTOM_NAV_FALLBACK });
-
-  useEffect(() => {
-    const topEl = document.querySelector('[data-app-top-nav]');
-    const bottomEl = document.querySelector('[data-app-bottom-nav]');
-    if (!topEl && !bottomEl) return;
-
-    const measure = () => {
-      setHeights({
-        top: topEl ? topEl.getBoundingClientRect().height : TOP_NAV_FALLBACK,
-        bottom: bottomEl ? bottomEl.getBoundingClientRect().height : BOTTOM_NAV_FALLBACK,
-      });
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    if (topEl) ro.observe(topEl);
-    if (bottomEl) ro.observe(bottomEl);
-    return () => ro.disconnect();
-  }, []);
-
-  return heights;
-};
 
 const STORAGE_DETAIL_ID = 'custDetailActiveId';
 
@@ -57,115 +31,49 @@ export const CustomersPage = () => {
     refetch,
   } = useCustomers();
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
   const [filterOpen, setFilterOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(() => !!sessionStorage.getItem('addCustomerForm'));
   const [editClient, setEditClient] = useState(null);
   const [rejectTarget, setRejectTarget] = useState(null);
   const [suspendTarget, setSuspendTarget] = useState(null);
 
-  // 1. Start instantly in the correct state (No flickering, no delays)
-  const [phase, setPhase] = useState(() => sessionStorage.getItem(STORAGE_DETAIL_ID) ? 'detail' : 'list');
-  const [detailId, setDetailId] = useState(() => sessionStorage.getItem(STORAGE_DETAIL_ID) || null);
-  const [detailCustomer, setDetailCustomer] = useState(null);
-  const [cardRect, setCardRect] = useState(null);
-  const [expanded, setExpanded] = useState(() => !!sessionStorage.getItem(STORAGE_DETAIL_ID));
-  const cardRefMap = useRef(new Map());
-  const [approvingId, setApprovingId] = useState(null);
-
-  const { top: topNavH, bottom: bottomNavH } = useNavHeights();
+  const [selectedCustomerId, setSelectedCustomerId] = useState(() => sessionStorage.getItem(STORAGE_DETAIL_ID) || null);
+  const [initialCustomer, setInitialCustomer] = useState(null);
 
   useEffect(() => {
-    if (detailId) sessionStorage.setItem(STORAGE_DETAIL_ID, detailId);
+    if (selectedCustomerId) sessionStorage.setItem(STORAGE_DETAIL_ID, selectedCustomerId);
     else sessionStorage.removeItem(STORAGE_DETAIL_ID);
-  }, [detailId]);
+  }, [selectedCustomerId]);
 
+  // ✨ FIX 1: Restored your old body-scroll lock so the background doesn't move when detail is open
   useEffect(() => {
-    const shouldLock = phase === 'expanding' || phase === 'collapsing';
-    document.body.style.overflow = shouldLock ? 'hidden' : '';
+    document.body.style.overflow = selectedCustomerId ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
-  }, [phase]);
+  }, [selectedCustomerId]);
 
-  const openDetail = useCallback((customer) => {
-    const el = cardRefMap.current.get(customer._id);
-    if (!el) return;
-
-    const rect = el.getBoundingClientRect();
-    setCardRect(rect);
-    setDetailId(customer._id);
-    setDetailCustomer(customer);
-    setExpanded(false);
-    setPhase('expanding');
-
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => setExpanded(true));
-    });
+  const closeDetail = useCallback(() => {
+    setSelectedCustomerId(null);
+    setInitialCustomer(null);
   }, []);
 
-  // Triggered either by a real back-press or programmatically.
-  const startCollapse = useCallback(() => {
-    let targetRect = cardRect;
+  useBackHandler(
+    !!selectedCustomerId,
+    closeDetail,
+    'custDetailView'
+  );
 
-    // 1. F5 ANIMATION RECOVERY: If we lost the coordinates due to a reload,
-    // grab them dynamically from the DOM right before we shrink!
-    if (!targetRect && detailId) {
-      const cardElement = cardRefMap.current.get(detailId);
-      if (cardElement) {
-        targetRect = cardElement.getBoundingClientRect();
-        setCardRect(targetRect);
-      }
-    }
-
-    // 2. FAILSAFE: If the card still isn't in the DOM (e.g., pagination change), gracefully fallback.
-    if (!targetRect) {
-      setPhase('list');
-      setDetailId(null);
-      setDetailCustomer(null);
-      setExpanded(false);
-      return;
-    }
-
-    // 3. Normal behavior: trigger the CSS shrink animation
-    setExpanded(false);
-    setPhase('collapsing');
-  }, [cardRect, detailId]); 
-
-  // We pass 'custDetail' as the static ID. 
-  useBackHandler(phase === 'detail', startCollapse, 'custDetail');
-
-  const onTransitionEnd = useCallback((e) => {
-    if (e.target !== e.currentTarget) return;
-    if (phase === 'expanding') {
-      setPhase('detail');
-    } else if (phase === 'collapsing') {
-      setPhase('list');
-      setDetailId(null);
-      setDetailCustomer(null);
-      setCardRect(null);
-    }
-  }, [phase]);
-
-  const overlayStyle = (() => {
-    if (expanded || !cardRect) {
-      return { top: topNavH, left: 0, right: 0, bottom: bottomNavH, borderRadius: 0 };
-    }
-    return { top: cardRect.top, left: cardRect.left, width: cardRect.width, height: cardRect.height, borderRadius: '1rem' };
-  })();
-
-  const showOverlay = phase !== 'list';
-
-  // ✨ Cleaned up API Call utilizing our modular structure
   const handleApprove = async (customer) => {
-    setApprovingId(customer._id);
     try {
       await api.approveClient(customer._id);
       toast.success(`Successfully approved ${customer.establishmentName}! Credentials emailed.`);
-      startCollapse();
+      if (selectedCustomerId === customer._id) closeDetail();
       refetch();
     } catch (error) {
-      console.error("Approval failed:", error);
       toast.error(error.message || 'Failed to approve customer.');
-    } finally {
-      setApprovingId(null);
     }
   };
 
@@ -174,12 +82,10 @@ export const CustomersPage = () => {
       await api.rejectClient(customer._id, reason);
       toast.success(`${customer.establishmentName} rejected`);
       setRejectTarget(null);
-      
-      // Close the detail view if the action originated from inside it
-      if (detailId === customer._id) startCollapse(); 
+      if (selectedCustomerId === customer._id) closeDetail();
       refetch();
-    } catch (err) { 
-      toast.error(err.message); 
+    } catch (err) {
+      toast.error(err.message);
     }
   };
 
@@ -188,24 +94,30 @@ export const CustomersPage = () => {
       await api.updateClientStatus(customer._id, 'Suspended');
       toast.success(`${customer.establishmentName} suspended`);
       setSuspendTarget(null);
-      startCollapse();
+      if (selectedCustomerId === customer._id) closeDetail();
       refetch();
-    } catch (err) { 
-      toast.error(err.message); 
+    } catch (err) {
+      toast.error(err.message);
     }
   };
 
   return (
-    <div className="relative">
-      <div className="px-4 py-5 space-y-4 max-w-2xl mx-auto pb-24" style={{ pointerEvents: showOverlay ? 'none' : 'auto' }}>
+    <div className="relative min-h-screen bg-slate-50">
+      
+      {/* ✨ FIX 2: The List is ALWAYS rendered now, preserving scroll state perfectly. 
+          Pointer events are disabled when the detail page is covering it. */}
+      <div 
+        className="px-4 py-5 space-y-4 max-w-2xl mx-auto pb-24"
+        style={{ pointerEvents: selectedCustomerId ? 'none' : 'auto' }}
+      >
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-slate-900 text-2xl font-bold">Customers</h1>
-            <p className="text-slate-500 text-base mt-0.5">
+            <h1 className="text-slate-900 text-3xl font-black tracking-tight">Customers</h1>
+            <p className="text-slate-500 text-base font-medium">
               {loading ? '…' : `${customers.length} registered pharmacies`}
             </p>
           </div>
-          <button onClick={() => setAddOpen(true)} className="flex items-center gap-1.5 bg-slate-900 text-white text-base font-semibold px-4 py-2.5 rounded-xl">
+          <button onClick={() => setAddOpen(true)} className="flex items-center gap-1.5 bg-slate-900 text-white text-base font-semibold px-4 py-2.5 rounded-xl transition-transform active:scale-95 shadow-sm">
             <Plus size={16} /> Add
           </button>
         </div>
@@ -228,37 +140,32 @@ export const CustomersPage = () => {
         <CustomerList
           customers={customers}
           loading={loading}
-          onViewDetail={openDetail}
+          selectedId={selectedCustomerId}
+          onViewDetail={(c) => {
+            setInitialCustomer(c);
+            setSelectedCustomerId(c._id);
+          }}
           onApprove={handleApprove}
           onReject={(c) => setRejectTarget(c)}
-          cardRefMap={cardRefMap}
-          animatingId={detailId}
         />
       </div>
 
-      {showOverlay && detailId && (
-        <div
-          className="fixed overflow-hidden bg-white shadow-2xl z-[55]"
-          style={{
-            ...overlayStyle,
-            transition: (phase === 'expanding' || phase === 'collapsing')
-              ? ['top 420ms cubic-bezier(0.4,0,0.2,1)', 'left 420ms cubic-bezier(0.4,0,0.2,1)', 'right 420ms cubic-bezier(0.4,0,0.2,1)', 'bottom 420ms cubic-bezier(0.4,0,0.2,1)', 'width 420ms cubic-bezier(0.4,0,0.2,1)', 'height 420ms cubic-bezier(0.4,0,0.2,1)', 'border-radius 420ms cubic-bezier(0.4,0,0.2,1)'].join(', ')
-              : 'none',
-          }}
-          onTransitionEnd={onTransitionEnd}
-        >
+      {/* ✨ Detail Page renders visually ON TOP of the list */}
+      <AnimatePresence>
+        {selectedCustomerId && (
           <CustomerDetailPage
-            clientId={detailId}
-            customer={detailCustomer}
+            key="detail"
+            clientId={selectedCustomerId}
+            initialCustomer={initialCustomer}
             onApprove={handleApprove}
-            onReject={(c) => setRejectTarget(c)} // ✨ Restored for the TakeActionModal inside DetailPage
+            onReject={(c) => setRejectTarget(c)}
             onListChange={() => {
-              startCollapse();
+              closeDetail();
               refetch();
             }}
           />
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
       <FilterDrawer
         open={filterOpen}

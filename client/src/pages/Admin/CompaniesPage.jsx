@@ -1,19 +1,43 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
+import { AnimatePresence } from 'framer-motion';
+
 import { CompaniesListView } from '../../features/Admin/CompaniesPage/CompaniesListView';
 import { CompanyDetailPage } from '../../features/Admin/CompaniesPage/CompanyDetailPage';
 import { PurchaseEntryModal } from '../../modals/AddPurchaseBillModal/PurchaseEntryModal';
 import { api } from '../../services/api';
-import { toast } from 'sonner';
+import { useBackHandler } from '../../hooks/useBackHandler';
 
 const CompaniesPage = () => {
-  const [selectedCompany, setSelectedCompany] = useState(null);
+  // Store the ID for F5 reloads
+  const [selectedCompanyId, setSelectedCompanyId] = useState(() => {
+    return sessionStorage.getItem('selectedCompanyId') || null;
+  });
+  
+  // Store the full object temporarily just to make the animation perfectly smooth
+  const [initialCompanyData, setInitialCompanyData] = useState(null);
+
   const [showPurchaseEntry, setShowPurchaseEntry] = useState(false);
   const [billsRefreshKey, setBillsRefreshKey] = useState(0);
-
-  // ★ NEW — needed by PurchaseEntryModal's `companies` prop. Fetched the
-  // exact same way PurchasesTab.jsx does (mapping _id -> id), since that's
-  // the shape the modal's internal `.find(c => c.id === ...)` lookups expect.
   const [purchaseModalCompanies, setPurchaseModalCompanies] = useState([]);
+
+  useEffect(() => {
+    if (selectedCompanyId) sessionStorage.setItem('selectedCompanyId', selectedCompanyId);
+    else sessionStorage.removeItem('selectedCompanyId');
+  }, [selectedCompanyId]);
+
+  useEffect(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, []);
+
+  useBackHandler(
+    !!selectedCompanyId,
+    () => {
+      setSelectedCompanyId(null);
+      setInitialCompanyData(null);
+    },
+    'companyDetailView'
+  );
 
   const fetchCompaniesForPurchaseModal = async () => {
     try {
@@ -28,7 +52,7 @@ const CompaniesPage = () => {
         pincode: c.pincode || '',
       })));
     } catch {
-      toast.error('Failed to load suppliers for purchase entry');
+      toast.error('Failed to load suppliers');
     }
   };
 
@@ -37,38 +61,48 @@ const CompaniesPage = () => {
     setShowPurchaseEntry(true);
   };
 
-  // If a company is selected, show the detail view
-  if (selectedCompany) {
-    return (
-      <>
-        <CompanyDetailPage
-          companyId={selectedCompany._id}
-          onBack={() => setSelectedCompany(null)}
-          onAddPurchaseBill={handleAddPurchaseBill}
-          billsRefreshKey={billsRefreshKey}
-        />
+  const closeDetail = () => {
+    setSelectedCompanyId(null);
+    setInitialCompanyData(null);
+  };
 
-        {showPurchaseEntry && (
-          <PurchaseEntryModal
-            onClose={() => {
-              setShowPurchaseEntry(false);
-              setBillsRefreshKey(k => k + 1);
+  return (
+    <>
+      {/* ✨ NEW: AnimatePresence allows components to animate as they mount/unmount */}
+      <AnimatePresence mode="wait">
+        {selectedCompanyId ? (
+          <CompanyDetailPage
+            key="detail"
+            companyId={selectedCompanyId}
+            initialCompany={initialCompanyData}
+            onBack={closeDetail}
+            onAddPurchaseBill={handleAddPurchaseBill}
+            billsRefreshKey={billsRefreshKey}
+          />
+        ) : (
+          <CompaniesListView
+            key="list"
+            onSelectCompany={(company) => {
+              setInitialCompanyData(company);
+              setSelectedCompanyId(company._id);
             }}
-            companies={purchaseModalCompanies}
-            onCompanyAdded={fetchCompaniesForPurchaseModal}
-            onProductAdded={() => {}}
-            lockedSupplierId={selectedCompany._id}
           />
         )}
-      </>
-    );
-  }
+      </AnimatePresence>
 
-  // Otherwise show the list view
-  return (
-    <CompaniesListView
-      onSelectCompany={(company) => setSelectedCompany(company)}
-    />
+      {showPurchaseEntry && (
+        <PurchaseEntryModal
+          onClose={() => {
+            setShowPurchaseEntry(false);
+            setBillsRefreshKey(k => k + 1);
+          }}
+          companies={purchaseModalCompanies}
+          onCompanyAdded={fetchCompaniesForPurchaseModal}
+          onProductAdded={() => {}}
+          lockedSupplierId={selectedCompanyId}
+        />
+      )}
+    </>
   );
 };
 

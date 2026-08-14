@@ -74,7 +74,7 @@ export const useCustomers = () => {
   const kpis = useMemo(() => ({
     active: customers.filter(c => c.status === 'Active').length,
     pending: customers.filter(c => c.status === 'Pending').length,
-    concerned: customers.filter(c => c.status === 'Credit Alert').length,
+    concerned: customers.filter(c => c.riskTier === 'Red').length,
     outstanding: customers.reduce((s, c) => s + (c.totalOutstanding || 0), 0),
   }), [customers]);
 

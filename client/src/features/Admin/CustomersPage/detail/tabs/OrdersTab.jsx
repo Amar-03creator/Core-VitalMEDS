@@ -1,5 +1,9 @@
 // customers/detail/tabs/OrdersTab.jsx
-import { ShoppingBag } from 'lucide-react';
+import { useState } from 'react';
+import { ShoppingBag, ChevronDown } from 'lucide-react';
+import { toast } from 'sonner';
+
+import OrderDetailModal from '../../../../../features/Admin/OrdersPage/modals/OrderDetailModal'; 
 
 const STATUS_PILL = {
   Placed:    'bg-amber-100 text-amber-700',
@@ -34,7 +38,11 @@ const Skeleton = () => (
   </div>
 );
 
-export const OrdersTab = ({ orders }) => {
+export const OrdersTab = ({ orders, onRefreshOrders }) => {
+  const [visibleCount, setVisibleCount] = useState(15);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [isActionBusy, setIsActionBusy] = useState(false);
+
   if (!orders) return <Skeleton />;
 
   if (!orders.length) {
@@ -46,17 +54,33 @@ export const OrdersTab = ({ orders }) => {
     );
   }
 
+  const handleModalAction = async (actionType, data) => {
+    if (actionType === 'refresh') {
+      if (onRefreshOrders) await onRefreshOrders();
+      setSelectedOrder(null);
+      return;
+    }
+    toast.info(`To ${actionType} this order, please process it from the main Orders Dashboard.`);
+  };
+
   const sorted = [...orders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const visibleOrders = sorted.slice(0, visibleCount);
 
   return (
-    <div className="space-y-3">
-      {sorted.map((order, i) => {
+    <div className="space-y-3 pb-6">
+      {visibleOrders.map((order, i) => {
         const pillCls = STATUS_PILL[order.status] || STATUS_PILL.Placed;
         const amount  = order.finalInvoiceAmount || order.estimatedOrderTotal;
+        
+        // ✨ NEW LOGIC: Only allow clicks if the order lifecycle is completely finished
+        const isComplete = order.status === 'Delivered' || order.status === 'Cancelled';
+        
         return (
           <div
             key={order._id || i}
-            className="bg-white border border-slate-200 rounded-2xl p-4 flex justify-between items-start"
+            onClick={() => isComplete && setSelectedOrder(order)}
+            className={`bg-white border border-slate-200 rounded-2xl p-4 flex justify-between items-start transition-all 
+              ${isComplete ? 'cursor-pointer hover:border-emerald-300 hover:shadow-md active:scale-[0.99]' : ''}`}
           >
             <div>
               <p className="text-base font-bold font-mono text-slate-900">{order.orderId}</p>
@@ -81,6 +105,25 @@ export const OrdersTab = ({ orders }) => {
           </div>
         );
       })}
+
+      {visibleCount < sorted.length && (
+        <button
+          onClick={() => setVisibleCount(prev => prev + 15)}
+          className="w-full mt-4 py-3.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 font-semibold rounded-xl flex justify-center items-center gap-2 transition-colors shadow-sm"
+        >
+          Load next 15 orders <ChevronDown size={18} />
+        </button>
+      )}
+
+      {selectedOrder && (
+        <OrderDetailModal
+          order={selectedOrder}
+          busy={isActionBusy}
+          onClose={() => setSelectedOrder(null)}
+          onAction={handleModalAction}
+          hideClientName={true} 
+        />
+      )}
     </div>
   );
 };

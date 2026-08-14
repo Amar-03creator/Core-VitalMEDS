@@ -1,82 +1,62 @@
-import { useState, useEffect, useMemo } from 'react';
 import { Plus } from 'lucide-react';
-import { api } from '../../../services/api';
-import { toast } from 'sonner';
+import { useState } from 'react';
+import { useCompanies } from './hooks/useCompanies';
 import { CompanySearchBar } from './components/Companysearchbar';
-import { CompanyListItem } from './components/Companylistitem';
+import { CompanyCard } from './components/CompanyCard';
 import { AddCompanyModal } from '../../../modals/AddCompanyModal';
+import { CompanyStatsBar } from './components/Companystatsbar';
 
 export const CompaniesListView = ({ onSelectCompany }) => {
-  const [companies, setCompanies] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const { companies, loading, search, setSearch, refetch } = useCompanies();
   const [showAddModal, setShowAddModal] = useState(false);
 
-  const fetchCompanies = async () => {
-    try {
-      const res = await api.getCompanies();
-      setCompanies(res.data || []);
-    } catch {
-      toast.error('Failed to load companies');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { fetchCompanies(); }, []);
-
-  const filtered = useMemo(() => {
-    if (!search) return companies;
-    const s = search.toLowerCase();
-    return companies.filter(c =>
-      c.companyName?.toLowerCase().includes(s) ||
-      c.shortCode?.toLowerCase().includes(s) ||
-      c.gstin?.toLowerCase().includes(s)
-    );
-  }, [companies, search]);
-
-  const handleCompanySaved = () => {
-    setShowAddModal(false);
-    fetchCompanies();
-  };
-
-  if (loading) {
-    return <p className="py-10 text-center text-slate-500 text-base">Loading companies…</p>;
-  }
-
   return (
-    <div className="px-4 py-4 space-y-4 max-w-2xl mx-auto">
+    <div className="px-4 py-4 space-y-4 max-w-2xl mx-auto pb-24 relative">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-slate-900 text-lg font-bold">Companies</h1>
-          <p className="text-slate-500 text-sm">Suppliers & purchase management</p>
+          <h1 className="text-slate-900 text-3xl font-black tracking-tight">Companies</h1>
+          <p className="text-slate-500 text-base font-medium">Suppliers & purchase management</p>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-1.5 bg-slate-900 text-white text-sm font-semibold px-3.5 py-2.5 rounded-xl"
+          className="flex items-center gap-1.5 bg-slate-900 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-transform active:scale-95 shadow-sm"
         >
           <Plus size={16} /> Add
         </button>
       </div>
 
+      <CompanyStatsBar companies={companies} />
+
       <CompanySearchBar value={search} onChange={setSearch} />
 
-      <div className="space-y-3">
-        {filtered.length === 0 ? (
-          <div className="py-12 text-center text-slate-500 text-base bg-white rounded-2xl border border-slate-200">
-            {companies.length === 0 ? 'No suppliers added yet' : 'No suppliers match your search'}
-          </div>
-        ) : (
-          filtered.map(c => (
-            <CompanyListItem key={c._id} company={c} onClick={() => onSelectCompany(c)} />
-          ))
-        )}
-      </div>
+      {loading ? (
+        <p className="py-10 text-center text-slate-500 text-base">Loading suppliers…</p>
+      ) : (
+        <div className="space-y-3">
+          {companies.length === 0 ? (
+            <div className="py-12 text-center text-slate-500 text-base bg-white rounded-2xl border border-slate-200">
+              {search ? 'No suppliers match your search' : 'No suppliers added yet'}
+            </div>
+          ) : (
+            companies.map((c, index) => (
+              <CompanyCard 
+                key={c._id} 
+                company={c} 
+                index={index} 
+                onClick={() => onSelectCompany(c)} 
+              />
+            ))
+          )}
+        </div>
+      )}
 
       {showAddModal && (
         <AddCompanyModal
           onClose={() => setShowAddModal(false)}
-          onSave={handleCompanySaved}
+          onSave={() => {
+            setShowAddModal(false);
+            refetch();
+          }}
         />
       )}
     </div>

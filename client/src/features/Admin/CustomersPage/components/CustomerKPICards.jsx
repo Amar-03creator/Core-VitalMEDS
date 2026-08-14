@@ -9,7 +9,7 @@ export const CustomerKPICards = ({ kpis }) => {
   return (
     <div className="grid grid-cols-2 gap-3">
       {cards.map(({ value, label, valueClass, bg }) => (
-        <div key={label} className={`rounded-2xl border p-4 ${bg}`}>
+        <div key={label} className={`rounded-2xl border p-3 ${bg}`}>
           <p className={`text-3xl font-bold ${valueClass}`}>{value}</p>
           <p className="text-sm font-medium mt-1 text-slate-500">{label}</p>
         </div>

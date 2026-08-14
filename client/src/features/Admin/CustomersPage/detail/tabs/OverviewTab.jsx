@@ -90,6 +90,21 @@ export const OverviewTab = ({ client, onSuspend, onEdit, onReactivate, onApprove
     }
   };
 
+  // 🐛 DEBUGGING DATA FLOW:
+  // This will print every single field your frontend knows about this customer
+  console.log("====================================");
+  console.log("🔍 INSPECTING CLIENT DATA");
+  console.log("Establishment:", client.establishmentName);
+  console.log("Is Claimed?:", client.isClaimed);
+  console.log("Available Fields:", Object.keys(client).join(", "));
+  console.log("FULL CLIENT OBJECT:", client);
+  console.log("====================================");
+
+  // ✨ NEW LOGIC: Does this client already have an app account?
+  // 1. They claimed an invite (isClaimed is true)
+  // 2. OR they self-registered (meaning they have a password and are waiting for approval)
+  const hasAppAccount = client.isClaimed === true || isPending;
+
   return (
     <div>
       {isPending && (
@@ -280,13 +295,16 @@ export const OverviewTab = ({ client, onSuspend, onEdit, onReactivate, onApprove
       {(onSuspend || onEdit || onReactivate || onApprove) && (
         <div className="flex flex-wrap gap-3 mt-4 pb-4">
 
-          <button
-            onClick={handleInviteClick}
-            disabled={inviting}
-            className="flex-1 min-w-[200px] flex items-center justify-center gap-2 bg-slate-900 text-emerald-400 px-4 py-3 rounded-xl font-bold hover:bg-slate-800 transition-colors disabled:opacity-50"
-          >
-            {inviting ? 'Generating...' : '📱 Invite to App via WhatsApp'}
-          </button>
+          {/* ✨ FIX: Hide the Invite button if the client already has an AWS Cognito Account attached */}
+          {!hasAppAccount && (
+            <button
+              onClick={handleInviteClick}
+              disabled={inviting}
+              className="flex-1 min-w-[200px] flex items-center justify-center gap-2 bg-slate-900 text-emerald-400 px-4 py-3 rounded-xl font-bold hover:bg-slate-800 transition-colors disabled:opacity-50"
+            >
+              {inviting ? 'Generating...' : '📱 Invite to App via WhatsApp'}
+            </button>
+          )}
 
           {onEdit && !isPending && (
             <button
@@ -342,7 +360,6 @@ export const OverviewTab = ({ client, onSuspend, onEdit, onReactivate, onApprove
         </div>
       )}
 
-      {/* ✨ FIX: Pass Client & docKey to Modal to reveal Verification buttons */}
       {viewingDoc && (
         <DocumentViewerModal
           client={client}
