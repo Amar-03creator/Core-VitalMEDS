@@ -1,4 +1,6 @@
-import { CheckCircle2, Clock, FileText, Truck, XCircle, ArrowRight, ClipboardEdit, ShoppingBag, Eye, Package } from 'lucide-react';
+// src/features/Admin/OrdersPage/utils.js
+
+import { CheckCircle2, Clock, FileText, Truck, XCircle, ArrowRight, ClipboardEdit, ShoppingBag, Eye, Package, PhoneCall } from 'lucide-react';
 
 export const ORDER_STATUS_META = {
   Placed:    { color: 'text-blue-700',    bg: 'bg-blue-50',    dot: 'bg-blue-500',    icon: Clock },
@@ -47,9 +49,9 @@ export const getOrderAmount = (order) => {
 };
 
 export const getSourceInfo = (order) => {
-  if (order.inquiryId) return { label: 'Converted Inquiry', icon: ArrowRight };
-  if (order.createdBy) return { label: 'Admin-created', icon: ClipboardEdit };
-  return { label: 'Direct Order', icon: ShoppingBag };
+  if (order.inquiryId) return { label: 'Converted Inquiry', icon: ArrowRight, isDirect: false };
+  if (order.createdBy || order.source === 'phoneIn' || order.source === 'admin') return { label: 'Phone-in Order', icon: PhoneCall, isDirect: true };
+  return { label: 'Direct Order', icon: ShoppingBag, isDirect: false };
 };
 
 export const getOrderActions = (order) => ({

@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { X, Truck, CheckCircle2, Loader2, Sparkles, FileText, Printer, Download, Send, Package, Ban, Eye, MessageSquare, ClipboardEdit } from 'lucide-react';
 import { toast } from 'sonner';
 import { useModalTrap, useScrollLock } from '../../../../hooks/useBackHandler';
-import { ORDER_STATUS_META, formatDateTime, formatDate, productLabel, getOrderActions, formatMoney } from '../utils';
+import { ORDER_STATUS_META, formatDateTime, formatDate, productLabel, getOrderActions, formatMoney, getSourceInfo } from '../utils';
 import { api } from '../../../../services/api';
 import { OrderCancelledPrompt } from '../../../../modals/MakeInvoiceModal/components/InvoiceOverlays';
 
@@ -58,7 +58,8 @@ function OrderProgressTracker({ order }) {
   );
 }
 
-export default function OrderDetailModal({ order, busy, onClose, onAction }) {
+// ✨ FIX: Added hideClientName prop
+export default function OrderDetailModal({ order, busy, onClose, onAction, hideClientName = false }) {
   useModalTrap(true, { onBackClose: onClose, customId: `order_detail_${order._id}` });
   useScrollLock(true);
 
@@ -113,7 +114,10 @@ export default function OrderDetailModal({ order, busy, onClose, onAction }) {
           <div className="bg-white px-5 pt-4 pb-3 border-b border-slate-100 flex justify-between items-start shrink-0">
             <div>
               <p className="font-mono text-slate-400 text-base">{order.orderId}</p>
-              <h3 className="text-slate-900 font-black text-xl">{order.clientId?.establishmentName || 'Unknown client'}</h3>
+              {/* ✨ FIX: Conditionally render the establishment name based on the prop */}
+              {!hideClientName && (
+                <h3 className="text-slate-900 font-black text-xl">{order.clientId?.establishmentName || 'Unknown client'}</h3>
+              )}
 
               <div className="flex items-center gap-2 mt-1.5">
                 <span className={`inline-flex items-center gap-1 text-sm font-bold px-2 py-0.5 rounded-md ${meta.bg} ${meta.color}`}>
@@ -150,13 +154,12 @@ export default function OrderDetailModal({ order, busy, onClose, onAction }) {
                   const shortCode = item.productId?.companyId?.shortCode || item.productId?.company || '—';
                   const plannedBatch = item.plannedBatches?.[0]?.batchId;
 
-                  // ✨ FIX: True offer batch check
                   const isOfferBatch = !!item.offerDescription;
                   let expiryText = '—';
 
-                  // ✨ FIX: Exact batch expiry overrides the generic snapshot for offers
                   const exactBatchExpiry = plannedBatch && typeof plannedBatch === 'object' ? (plannedBatch.expiryDate || plannedBatch.expiry) : null;
                   const rawDate = exactBatchExpiry || item.expiryDate || item.closestExpiry;
+                  const { isDirect } = getSourceInfo(order);
 
                   if (rawDate) {
                     const d = new Date(rawDate);
@@ -175,10 +178,6 @@ export default function OrderDetailModal({ order, busy, onClose, onAction }) {
                   const providedDisplay = providedFree > 0 ? `${providedChargeable} + ${providedFree}` : providedChargeable;
                   const lineTotal = item.lineTotal != null ? item.lineTotal : item.taxableValue || 0;
 
-                  let lineDiscStr = null;
-                  if (item.discountType === 'percent' && item.discountValue > 0) lineDiscStr = `${item.discountValue}%`;
-                  else if (item.discountType === 'amount' && item.discountValue > 0) lineDiscStr = `₹${item.discountValue}`;
-
                   const isInvoiced = ['Invoiced', 'Packed', 'Shipped', 'Delivered'].includes(order.status);
 
                   return (
@@ -196,20 +195,23 @@ export default function OrderDetailModal({ order, busy, onClose, onAction }) {
                       </div>
 
                       <div className="w-full px-1">
-
                         <div className="flex justify-between items-center gap-x-3 md:gap-x-5 gap-y-2 text-base md:text-base font-medium">
                           <span className="text-slate-600">MRP: <strong className="text-slate-900">{formatMoney(mrp)}</strong></span>
-
-                          {/* ✨ FIX: Will always show "Exp:" instead of "Est. Exp:" if it's an offer batch! */}
                           <span className="text-slate-600">{(isInvoiced || isOfferBatch) ? 'Exp:' : 'Est. Exp:'} <strong className="text-slate-900">{expiryText}</strong></span>
-                          <span className="text-slate-600">Req: <strong className="text-slate-900">{requestedQty}</strong></span>
 
-                          {isInvoiced && (
-                            <span className="text-slate-600">Prov: <strong className="text-slate-900">{providedDisplay}</strong></span>
+                          {/* ✨ The conditional logic for Qty vs Req/Prov */}
+                          {!isDirect ? (
+                            <>
+                              <span className="text-slate-600">Req: <strong className="text-slate-900">{requestedQty}</strong></span>
+                              {isInvoiced && (
+                                <span className="text-slate-600">Prov: <strong className="text-slate-900">{providedDisplay}</strong></span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-slate-600">Qty: <strong className="text-slate-900">{providedDisplay || requestedQty}</strong></span>
                           )}
                         </div>
 
-                        {/* Row 2 */}
                         <div className="flex justify-between items-center gap-x-3 md:gap-x-5 gap-y-2 text-sm md:text-base font-medium mt-1.5">
                           {(isInvoiced || isOfferBatch) ? (
                             <span className="text-slate-600">PTR: <strong className="text-slate-900">{formatMoney(ptr)}</strong></span>
@@ -217,12 +219,10 @@ export default function OrderDetailModal({ order, busy, onClose, onAction }) {
                             <span className="text-slate-400">Est. PTR: <strong className="text-slate-600">{formatMoney(ptr)}</strong></span>
                           )}
 
-                          {/* ✨ FIX 2: Discount pill rendering completely removed from here */}
-
                           {isOfferBatch && (
                             <span className="inline-flex items-center gap-1 text-orange-800 bg-orange-100 px-2 py-0.5 rounded text-sm font-bold shadow-sm border border-orange-300 max-w-[150px] md:max-w-[250px]">
-                              <Sparkles size={14} className="shrink-0" /> 
-                              <span className="truncate">'Offer Applied'</span>
+                              <Sparkles size={14} className="shrink-0" />
+                              <span className="truncate">Offer Applied</span>
                             </span>
                           )}
 
@@ -274,7 +274,7 @@ export default function OrderDetailModal({ order, busy, onClose, onAction }) {
                   <span className="text-slate-800 text-sm md:text-base font-mono font-bold truncate">INV: {order.invoiceNumber}</span>
                 </div>
 
-                {actions.canDownloadInvoice && (
+                {(order.invoiceDocumentId || order.invoiceNumber) && (
                   <div className="flex items-center gap-2 shrink-0">
                     <button onClick={() => handleAction('print', order)} disabled={busy} className="p-2 bg-white border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors disabled:opacity-50 shadow-sm">
                       {busy && loadingAction === 'print' ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}

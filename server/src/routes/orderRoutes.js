@@ -9,7 +9,7 @@ router.post('/', orderController.createOrder);
 router.post('/convert', orderController.convertInquiryToOrder);
 router.get('/', orderController.getOrders);
 router.get('/:id', orderController.getOrderById);
-router.get('/:id/invoice/pdf', orderController.downloadInvoicePdf);   // Invoice PDF download
+router.get('/:id/invoice/pdf', authenticate, orderController.downloadInvoicePdf);   // Invoice PDF download
 
 // Client editing
 router.post('/:id/start-edit', orderController.startEditOrder);

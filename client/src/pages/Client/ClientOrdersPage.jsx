@@ -28,6 +28,9 @@ import ConfirmEditModal from '../../features/Client/OrdersPage/components/Modals
 
 export default function ClientOrdersPage() {
   const location = useLocation();
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
   const { isApproved, clientId } = useCurrentClient();
 
   const [activeTab, setActiveTab] = useState(() => sessionStorage.getItem('ordersActiveTab') || location.state?.initialTab || 'inquiries');
@@ -35,7 +38,7 @@ export default function ClientOrdersPage() {
   const [inquirySubTab, setInquirySubTab] = useState(() => sessionStorage.getItem('inquiriesSubTab') || 'pending');
 
   const [detailOrder, setDetailOrder] = useState(null);
-  
+
   // ✨ SINGLE INQUIRY STATE
   const [selectedInquiry, setSelectedInquiry] = useState(null);
 
@@ -43,7 +46,7 @@ export default function ClientOrdersPage() {
   const [inquiries, setInquiries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState(null);
-  
+
   const [busyId, setBusyId] = useState(null);
 
   const [orderFilters, setOrderFilters] = useState(EMPTY_ORDER_FILTERS);
@@ -197,7 +200,7 @@ export default function ClientOrdersPage() {
       const blob = await api.downloadOrderInvoice(order._id);
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
-      setTimeout(() => URL.revokeObjectURL(url), 30000); 
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
     } catch (err) { toast.error('Failed to view invoice.'); } finally { setBusyId(null); }
   };
 
@@ -251,8 +254,8 @@ export default function ClientOrdersPage() {
   return (
     <div className="px-4 py-6 space-y-5 max-w-5xl mx-auto">
       <div>
-        <h1 className="text-slate-900 text-2xl font-bold">History & Tracker</h1>
-        <p className="text-slate-500 text-base mt-0.5">Manage your inquiries, quotes, and active orders.</p>
+        <h1 className="text-slate-900 text-3xl font-black tracking-tight">History & Tracker</h1>
+        <p className="text-slate-500 text-base font-medium">Manage your inquiries, quotes, and active orders.</p>
       </div>
 
       <NoticeBanner notice={notice} onDismiss={() => setNotice(null)} />
@@ -373,8 +376,8 @@ export default function ClientOrdersPage() {
           onConfirmDelivery={handleConfirmDelivery}
           onDownloadInvoice={handleDownloadInvoice}
           onPrintInvoice={handlePrintInvoice}
-          onEdit={(o) => { 
-            setDetailOrder(null); 
+          onEdit={(o) => {
+            setDetailOrder(null);
             if (o.status === 'Editing') {
               setEditOrder(o);
             } else {
@@ -383,14 +386,14 @@ export default function ClientOrdersPage() {
           }}
         />
       )}
-      
+
       {/* ✨ REPLACED: Single Smart Inquiry Modal */}
       {selectedInquiry && (
-        <InquiryModal 
-          inquiry={selectedInquiry} 
-          busyId={busyId} 
-          onClose={() => setSelectedInquiry(null)} 
-          onDelete={(inq) => setReasonModal({ kind: 'inquiry', target: inq })} 
+        <InquiryModal
+          inquiry={selectedInquiry}
+          busyId={busyId}
+          onClose={() => setSelectedInquiry(null)}
+          onDelete={(inq) => setReasonModal({ kind: 'inquiry', target: inq })}
           onConvert={handleConvert}
           onReject={handleRejectQuote}
         />

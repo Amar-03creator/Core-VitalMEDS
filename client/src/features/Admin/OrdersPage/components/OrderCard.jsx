@@ -9,14 +9,18 @@ export default function OrderCard({ order, onOpen }) {
   const SourceIcon = source.icon;
 
   return (
-    <button onClick={() => onOpen(order)} className="w-full text-left bg-white rounded-2xl border border-slate-200 p-4 md:hidden hover:shadow-sm transition-all active:scale-[0.98]">
+    <button onClick={() => onOpen(order)} className="relative w-full text-left bg-white rounded-2xl border border-slate-200 p-4 md:hidden hover:shadow-sm transition-all active:scale-[0.98]">
+      
+      {/* ✨ FIX: Centered floating mobile badge! */}
+      <span className={`absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex items-center gap-1 text-sm font-bold px-2 py-0.5 rounded-full shadow-sm border border-white ${meta.bg} ${meta.color}`}>
+        <StatusIcon size={11} /> {order.status}
+      </span>
+
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
+          {/* ✨ FIX: Removed the inline status badge from this row */}
           <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
             <span className="text-slate-400 text-sm font-mono font-bold">{order.orderId}</span>
-            <span className={`flex items-center gap-1 text-sm font-bold px-2 py-0.5 rounded-full ${meta.bg} ${meta.color}`}>
-              <StatusIcon size={11} /> {order.status}
-            </span>
             <span className="text-slate-400 text-sm ml-1 font-bold">{formatDateTime(order.createdAt)}</span>
           </div>
           

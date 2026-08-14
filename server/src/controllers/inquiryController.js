@@ -126,6 +126,23 @@ exports.createInquiry = async (req, res) => {
       return res.status(400).json({ message: 'At least one item is required.' });
     }
 
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const existingInquiry = await Inquiry.findOne({
+      clientId: clientId,
+      createdAt: { $gte: startOfDay, $lte: endOfDay }
+    });
+
+    if (existingInquiry) {
+      return res.status(429).json({ 
+        message: 'You have already submitted an inquiry today. Please wait until tomorrow to submit another one.' 
+      });
+    }
+
     const client = await Client.findById(clientId).select('clientId establishmentName');
     if (!client) return res.status(404).json({ message: 'Client not found.' });
 
