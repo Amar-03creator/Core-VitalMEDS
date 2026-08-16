@@ -15,9 +15,7 @@ export default defineConfig({
   define: {
     global: 'window',
   },
-  // Hides your source code in the Inspect tab
   build: {
-    sourcemap: false,
-    minify: 'esbuild',
+    sourcemap: false, // This is the ONLY line actually needed to hide your code!
   }
 })
