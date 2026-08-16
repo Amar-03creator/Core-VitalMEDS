@@ -8,7 +8,19 @@ provider:
   memorySize: 256
   timeout: 15
   httpApi:
-    cors: true
+    cors:
+      allowedOrigins:
+        - '*'
+      allowedHeaders:
+        - Content-Type
+        - Authorization
+      allowedMethods:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
   environment:
     MONGO_URI: mongodb+srv://vitalmedsAI_admin:Amarfiku456@vital-ai.24kpznh.mongodb.net/vitalmeds?appName=Vital-AI
     COGNITO_USER_POOL_ID: ap-south-1_t7cmqYdPT
