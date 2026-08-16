@@ -9,6 +9,12 @@ provider:
   timeout: 15
   httpApi:
     cors: true
+  environment:
+    MONGO_URI: mongodb+srv://vitalmedsAI_admin:Amarfiku456@vital-ai.24kpznh.mongodb.net/vitalmeds?appName=Vital-AI
+    COGNITO_USER_POOL_ID: ap-south-1_t7cmqYdPT
+    COGNITO_CLIENT_ID: 2gomoic0dpgtimj3dg8tfjqceu
+    AWS_S3_BUCKET: corevitalmeds-kyc-vault
+    S3_BUCKET_NAME: corevitalmeds-kyc-vault 
   iamRoleStatements:
     - Effect: Allow
       Action:
@@ -16,17 +22,18 @@ provider:
         - s3:GetObject
         - s3:DeleteObject
       Resource: "arn:aws:s3:::corevitalmeds-kyc-vault/*"
-  environment:
-    MONGO_URI: mongodb+srv://vitalmedsAI_admin:Amarfiku456@vital-ai.24kpznh.mongodb.net/vitalmeds?appName=Vital-AI
-    COGNITO_USER_POOL_ID: ap-south-1_t7cmqYdPT
-    COGNITO_CLIENT_ID: 2gomoic0dpgtimj3dg8tfjqceu
-    AWS_S3_BUCKET: corevitalmeds-kyc-vault
-    S3_BUCKET_NAME: corevitalmeds-kyc-vault # ✨ Added for bulletproof variable matching
-
-functions:
-  api:
-    handler: server.handler
-    events:
-      - httpApi:
-          path: '/{proxy+}'
-          method: '*'
+    - Effect: Allow
+      Action:
+        - cognito-idp:AdminAddUserToGroup
+        - cognito-idp:AdminDeleteUser
+        - cognito-idp:AdminInitiateAuth
+        - cognito-idp:AdminDisableUser
+        - cognito-idp:AdminEnableUser
+        - cognito-idp:AdminSetUserPassword
+        - cognito-idp:AdminGetUser
+      Resource: "arn:aws:cognito-idp:ap-south-1:528757807659:userpool/ap-south-1_t7cmqYdPT"
+    - Effect: Allow
+      Action:
+        - ses:SendEmail
+        - ses:SendRawEmail
+      Resource: "*"
