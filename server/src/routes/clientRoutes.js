@@ -37,13 +37,15 @@ const {
 } = require('../controllers/clientSelfController');
 
 // ── Directory ──────────────────────────────────────────────────────────
+router.get('/public-contact', getPublicContactInfo);
+router.get('/duplicates/check', checkDuplicate);
+
 router.get('/', authenticate, authorize('admin'), getAllClients);
 router.post('/', authenticate, authorize('admin'), createClient);
 
 
-router.get('/duplicates/check', checkDuplicate);
 router.get('/distributor-profile', authenticate, authorize('client'), getDistributorProfile);
-router.get('/public-contact', getPublicContactInfo);
+
 
 // ── Client self-service ("me") ──────────────────────────────────────────
 // MUST be above /:id so Express doesn't treat "me" as an ObjectId.

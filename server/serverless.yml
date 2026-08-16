@@ -4,7 +4,7 @@ provider:
   name: aws
   runtime: nodejs20.x
   region: ap-south-1
-  stage: prod
+  stage: production
   memorySize: 256
   timeout: 15
   httpApi:

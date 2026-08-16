@@ -41,4 +41,4 @@ jobs:
       - name: Deploy Serverless Backend
         run: |
           cd server
-          npx serverless@3 deploy --stage prod
+          npx serverless@3 deploy --stage production
