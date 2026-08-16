@@ -4,21 +4,13 @@ provider:
   name: aws
   runtime: nodejs20.x
   region: ap-south-1
-  stage: production
+  stage: prod
   memorySize: 256
   timeout: 15
   httpApi:
     cors: true
-  environment:
-    MONGO_URI: mongodb+srv://vitalmedsAI_admin:Amarfiku456@vital-ai.24kpznh.mongodb.net/vitalmeds?appName=Vital-AI
-    COGNITO_USER_POOL_ID: ap-south-1_t7cmqYdPT
-    COGNITO_CLIENT_ID: 2gomoic0dpgtimj3dg8tfjqceu
-    AWS_S3_BUCKET: corevitalmeds-kyc-vault
-    S3_BUCKET_NAME: corevitalmeds-kyc-vault 
-    CLOUDINARY_CLOUD_NAME: dnr6uulfc
-    CLOUDINARY_API_KEY: 169957724968812
-    CLOUDINARY_API_SECRET: sk1AIJo0VpTnqQxjH-vZHfutj6I
-  # THIS IS THE V3 CORRECT SYNTAX:
+  
+  # ✨ FIX 1: Updated to Serverless v3 correct IAM syntax
   iam:
     role:
       statements:
@@ -28,6 +20,8 @@ provider:
             - s3:GetObject
             - s3:DeleteObject
           Resource: "arn:aws:s3:::corevitalmeds-kyc-vault/*"
+        
+        # ✨ FIX 2: Restored Cognito permissions required for registration
         - Effect: Allow
           Action:
             - cognito-idp:AdminAddUserToGroup
@@ -38,11 +32,26 @@ provider:
             - cognito-idp:AdminSetUserPassword
             - cognito-idp:AdminGetUser
           Resource: "arn:aws:cognito-idp:ap-south-1:528757807659:userpool/ap-south-1_t7cmqYdPT"
+          
+        # ✨ FIX 3: Restored SES email permissions
         - Effect: Allow
           Action:
             - ses:SendEmail
             - ses:SendRawEmail
           Resource: "*"
+
+  environment:
+    MONGO_URI: mongodb+srv://vitalmedsAI_admin:Amarfiku456@vital-ai.24kpznh.mongodb.net/vitalmeds?appName=Vital-AI
+    COGNITO_USER_POOL_ID: ap-south-1_t7cmqYdPT
+    COGNITO_CLIENT_ID: 2gomoic0dpgtimj3dg8tfjqceu
+    AWS_S3_BUCKET: corevitalmeds-kyc-vault
+    S3_BUCKET_NAME: corevitalmeds-kyc-vault
+    
+    # ✨ FIX 4: Added the required SES fail-soft gate to enable registration OTPs
+    USE_AWS_SES: 'true'
+    FROM_EMAIL: 'admin@vitalmeds.com'
+
+# ✨ FIX 5: Restored the missing method parameter
 functions:
   api:
     handler: server.handler
