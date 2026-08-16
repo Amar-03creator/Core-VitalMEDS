@@ -43,3 +43,10 @@ provider:
             - ses:SendEmail
             - ses:SendRawEmail
           Resource: "*"
+functions:
+  api:
+    handler: server.handler
+    events:
+      - httpApi:
+          path: '/{proxy+}'
+          method: '*'
